@@ -1,0 +1,8 @@
+node_modules/**
+src/**
+webview-ui/**
+tests/**
+.vscode/**
+*.mjs
+tsconfig.json
+package-lock.json

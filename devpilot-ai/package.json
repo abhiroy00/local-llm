@@ -1,0 +1,95 @@
+{
+  "name": "devpilot-ai",
+  "displayName": "DevPilot AI",
+  "description": "Your Code. Your Machine. Your AI. Local-first coding assistant foundation.",
+  "version": "0.1.0",
+  "publisher": "devpilot",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onView:devpilot.chat"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "devpilot.openChat",
+        "title": "DevPilot AI: Open Chat"
+      },
+      {
+        "command": "devpilot.newConversation",
+        "title": "DevPilot AI: New Conversation"
+      },
+      {
+        "command": "devpilot.openSettings",
+        "title": "DevPilot AI: Open Settings"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "devpilot",
+          "title": "DevPilot AI",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "devpilot": [
+        {
+          "type": "webview",
+          "id": "devpilot.chat",
+          "name": "DevPilot AI"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "DevPilot AI",
+      "properties": {
+        "devpilot.ollamaEndpoint": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Ollama endpoint for the upcoming inference integration."
+        },
+        "devpilot.contextLimit": {
+          "type": "number",
+          "default": 4096,
+          "minimum": 1024,
+          "maximum": 32768,
+          "description": "Context budget for future model requests."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit && tsc -p webview-ui/tsconfig.json --noEmit",
+    "lint": "eslint src webview-ui/src tests",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build",
+    "vscode:prepublish": "npm run build"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/vscode": "^1.95.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.14.0",
+    "postcss": "^8.0.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.72.2",
+    "vitest": "^5.1.0"
+  }
+}
