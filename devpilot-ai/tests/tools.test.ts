@@ -10,7 +10,7 @@ import { approvedTerminal, runProcess } from '../src/tools/Terminal';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 let root:string;
-beforeEach(async()=>{ vi.clearAllMocks(); workspace.isTrusted=true; workspace.textDocuments=[]; root=await fs.mkdtemp(path.join(os.tmpdir(),'devpilot-tools-')); await fs.writeFile(path.join(root,'a.ts'),'before'); workspace.openTextDocument.mockResolvedValue({isDirty:false,version:1,positionAt:()=>({line:0,character:0}),getText:()=> 'before',save:async()=>true}); window.showWarningMessage.mockResolvedValue(undefined); commands.executeCommand.mockResolvedValue(undefined); });
+beforeEach(async()=>{ vi.clearAllMocks(); workspace.isTrusted=true; workspace.textDocuments=[]; root=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'devpilot-tools-'))); await fs.writeFile(path.join(root,'a.ts'),'before'); workspace.openTextDocument.mockResolvedValue({isDirty:false,version:1,positionAt:()=>({line:0,character:0}),getText:()=> 'before',save:async()=>true}); window.showWarningMessage.mockResolvedValue(undefined); commands.executeCommand.mockResolvedValue(undefined); });
 afterEach(async()=>{ await fs.rm(root,{recursive:true,force:true}); });
 const signal=()=>new AbortController().signal;
 it('requires approval and never applies rejected edits',async()=>{
