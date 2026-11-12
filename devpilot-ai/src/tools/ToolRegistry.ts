@@ -4,6 +4,7 @@ import { FileEditor, fingerprint } from './FileEditor';
 import { approvedTerminal } from './Terminal';
 import { SemanticIndex } from '../indexing/SemanticIndex';
 import { OllamaService } from '../services/OllamaService';
+import { PersistenceService, workspaceKey } from '../services/PersistenceService';
 import type { ApprovalFunction } from '../security/ApprovalService';
 
 import { schemas, outputSchemas, writeTools, toolCatalog, type ToolName } from './ToolSchemas';
@@ -11,7 +12,7 @@ export type { ToolName } from './ToolSchemas';
 export class ToolRegistry implements vscode.Disposable {
   readonly editor: FileEditor;
   private semantic?: SemanticIndex;
-  constructor(readonly workspace: WorkspaceService, private readonly log:(name:string,status:string)=>void,private readonly approve?:ApprovalFunction) { this.editor = new FileEditor(workspace,approve); }
+  constructor(readonly workspace: WorkspaceService, private readonly log:(name:string,status:string)=>void,private readonly approve?:ApprovalFunction,private readonly persistence?:PersistenceService) { this.editor = new FileEditor(workspace,approve,persistence,workspaceKey(workspace.root)); }
   catalog(mode:'plan'|'agent'): unknown {
     return toolCatalog(mode);
   }
@@ -29,7 +30,7 @@ export class ToolRegistry implements vscode.Disposable {
         case 'search_semantic': {
           const config=vscode.workspace.getConfiguration('devpilot');const model=config.get<string>('embeddingModel','');
           if(!model) throw new Error('Semantic search is disabled. Configure an installed Embedding Model, or use search_code.');
-          this.semantic ??= new SemanticIndex(this.workspace,new OllamaService(config.get<string>('ollamaEndpoint','http://localhost:11434')),model);
+          this.semantic ??= new SemanticIndex(this.workspace,new OllamaService(config.get<string>('ollamaEndpoint','http://localhost:11434')),model,this.persistence,workspaceKey(this.workspace.root));
           result=await this.semantic.search(data.query as string,signal); break;
         }
         case 'list_files': result = await this.workspace.files(signal); break;

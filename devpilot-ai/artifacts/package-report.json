@@ -1,8 +1,8 @@
 {
   "version": "0.3.1",
   "packagePath": "artifacts\\devpilot-ai-0.3.1.vsix",
-  "bytes": 331038,
-  "sha256": "11ef8fe5f73f103048b3e7d21c936c5b5da2c20bc46ecda96f13c647a3db300f",
+  "bytes": 331307,
+  "sha256": "44e375b870f88aeadf3fd2f63bad576e132f382cd37d14d087f0cd82e3799f6f",
   "files": [
     ".gitignore",
     "ARCHITECTURE.md",

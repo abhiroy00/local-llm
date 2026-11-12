@@ -13,4 +13,10 @@ describe('webview message boundary', () => {
     expect(parseClientMessage({type:'selectModel',model:'local:test'})).toEqual({type:'selectModel',model:'local:test'});
     expect(parseClientMessage({type:'selectModel',model:1})).toBeUndefined();
   });
+  it('validates saved conversation actions', () => {
+    const id='00000000-0000-4000-8000-000000000000';
+    expect(parseClientMessage({type:'selectConversation',id})).toEqual({type:'selectConversation',id});
+    expect(parseClientMessage({type:'deleteConversation',id})).toEqual({type:'deleteConversation',id});
+    expect(parseClientMessage({type:'deleteConversation',id:'not-a-uuid'})).toBeUndefined();
+  });
 });

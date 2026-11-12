@@ -10,21 +10,30 @@ export class WorkspaceService {
     const root = await fs.realpath(this.root);
     const parts = relative.split('/');
     let current = root;
-    let rules = ignore().add(this.excludes);
+    // User/editor exclusions are evaluated separately so a repository .gitignore
+    // negation can never re-include a path the user explicitly excluded.
+    const excluded = ignore().add(this.excludes);
+    let repository = ignore();
     for (let i = 0; i < parts.length; i++) {
-      try { rules = rules.add((await fs.readFile(path.join(current,'.gitignore'),'utf8')).split(/\r?\n/).filter(s => s && !s.startsWith('#')).map(s => {
+      const prefix = parts.slice(0,i).join('/');
+      try { repository = repository.add((await fs.readFile(path.join(current,'.gitignore'),'utf8')).split(/\r?\n/).filter(s => s && !s.startsWith('#')).map(s => {
         const negative = s.startsWith('!'); const pattern = negative ? s.slice(1) : s;
-        const prefix = parts.slice(0,i).join('/');
-        return (negative ? '!' : '') + (prefix ? prefix + '/' : '') + (pattern.startsWith('/') ? pattern.slice(1) : pattern.includes('/') ? pattern : '**/' + pattern);
-      })); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; }
+        if (!pattern) return '';
+        const anchored = pattern.startsWith('/');
+        const body = anchored ? pattern.slice(1) : pattern.includes('/') ? pattern : '**/' + pattern;
+        const scoped = prefix ? prefix + '/' + body : anchored ? '/' + body : body;
+        return (negative ? '!' : '') + scoped;
+      }).filter(s => s && s !== '!' && s !== '/')); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; }
+      const blocked = (candidate: string) => excluded.ignores(candidate) || repository.ignores(candidate);
+      const child = parts.slice(0,i+1).join('/');
       current = path.join(current,parts[i]);
       try {
         const stat = await fs.lstat(current);
         if (stat.isSymbolicLink()) throw new Error('Symlinks and junctions are not accessible.');
-        if (rules.ignores(parts.slice(0,i+1).join('/') + (stat.isDirectory() ? '/' : ''))) throw new Error('Path excluded by ignore rules.');
+        if (blocked(child + (stat.isDirectory() ? '/' : ''))) throw new Error('Path excluded by ignore rules.');
       } catch (e) {
         if ((e as NodeJS.ErrnoException).code !== 'ENOENT' || !allowMissing) throw e;
-        if (rules.ignores(parts.slice(0,i+1).join('/'))) throw new Error('Path excluded by ignore rules.');
+        if (blocked(child)) throw new Error('Path excluded by ignore rules.');
       }
     }
     return current;

@@ -41,9 +41,32 @@ export async function approvedTerminal(root: string,executable:string,args:strin
   if(approvedManifest!==undefined && await readManifest()!==approvedManifest) throw new Error('package.json changed during approval. Review the command again.');
   const result = await runProcess(executable,args,root,signal);
   if(executable === 'git' && result.exitCode === 0) {
-    const allowed = new Set((await (allowedWorkspace ?? new WorkspaceService(root,vscode.workspace.getConfiguration('devpilot').get<string[]>('ignorePatterns',[]))).files(signal)).files);
-    if(args[0] === 'diff') result.output = result.output.split(/(?=^diff --git )/m).filter(block => { const match=/^diff --git a\/(.*?) b\/(.*?)\r?$/m.exec(block); return match && allowed.has(match[1]) && allowed.has(match[2]); }).join('');
-    else result.output = result.output.split(/\r?\n/).filter(line => allowed.has(line.slice(3))).join('\n');
+    const workspace = allowedWorkspace ?? new WorkspaceService(root,vscode.workspace.getConfiguration('devpilot').get<string[]>('ignorePatterns',[]));
+    const allowed = new Set((await workspace.files(signal)).files);
+    // Deleted and renamed-away paths are absent from the listing but are still valid,
+    // non-sensitive workspace paths, so resolve them with allowMissing.
+    const included = async (file: string) => {
+      if (allowed.has(file)) return true;
+      // C-quoted unusual names cannot be validated reliably, so keep them filtered.
+      if (file.startsWith('"')) return false;
+      try { await workspace.resolve(file, true); return true; } catch { return false; }
+    };
+    if(args[0] === 'diff') {
+      const blocks: string[] = [];
+      for (const block of result.output.split(/(?=^diff --git )/m)) {
+        const match=/^diff --git a\/(.*?) b\/(.*?)\r?$/m.exec(block);
+        if (match && await included(match[1]) && await included(match[2])) blocks.push(block);
+      }
+      result.output = blocks.join('');
+    } else {
+      const lines: string[] = [];
+      for (const line of result.output.split(/\r?\n/)) {
+        if (!line) continue;
+        const paths = line.slice(3).split(' -> ');
+        if (paths.length && (await Promise.all(paths.map(included))).every(Boolean)) lines.push(line);
+      }
+      result.output = lines.join('\n');
+    }
   }
   return result;
 }

@@ -2,6 +2,10 @@ import { expect,it,vi } from 'vitest';
 import { cosine,SemanticIndex } from '../src/indexing/SemanticIndex';
 import { OllamaService } from '../src/services/OllamaService';
 import { WorkspaceService } from '../src/services/WorkspaceService';
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { PersistenceService } from '../src/services/PersistenceService';
 it('ranks similar vectors and rejects dimension changes',()=>{
   expect(cosine([1,0],[1,0])).toBe(1);expect(cosine([1,0],[0,1])).toBe(0);expect(()=>cosine([1],[1,2])).toThrow();
 });
@@ -12,4 +16,20 @@ it('indexes allowed text and excludes entries changed after indexing',async()=>{
   const index=new SemanticIndex(ws,ollama,'embed');expect(await index.build(new AbortController().signal)).toMatchObject({indexed:2});
   read.mockImplementation(async file=>file==='a.ts'?'changed':'beta');
   expect(await index.search('alpha',new AbortController().signal)).toMatchObject({matches:[{file:'b.ts',score:0}]});
+});
+it('reuses persisted vectors after recreating the semantic index',async()=>{
+  const storage=await fs.mkdtemp(join(tmpdir(),'devpilot-index-'));
+  try {
+    const ws=new WorkspaceService('unused');const files=vi.spyOn(ws,'files').mockResolvedValue({files:['a.ts'],truncated:false});
+    vi.spyOn(ws,'read').mockResolvedValue('alpha');
+    const ollama=new OllamaService('http://localhost:11434');
+    vi.spyOn(ollama,'models').mockResolvedValue(['embed']);vi.spyOn(ollama,'embed').mockResolvedValue([[1,0]]);
+    const first=new SemanticIndex(ws,ollama,'embed',await PersistenceService.open(storage),'workspace');
+    await first.build(new AbortController().signal);
+    const restored=new SemanticIndex(ws,ollama,'embed',await PersistenceService.open(storage),'workspace');
+    expect(await restored.search('alpha',new AbortController().signal)).toMatchObject({matches:[{file:'a.ts',score:1}]});
+    expect(files).toHaveBeenCalledTimes(1);
+    expect(ollama.models).toHaveBeenCalledTimes(1);
+    expect(ollama.embed).toHaveBeenCalledTimes(2);
+  } finally { await fs.rm(storage,{recursive:true,force:true}); }
 });

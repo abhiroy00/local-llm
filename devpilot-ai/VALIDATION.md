@@ -2,10 +2,11 @@
 
 ## Passed
 
-- npm run check: host/UI/native-harness TypeScript, ESLint, 8 test files / 34 tests and production build passed.
+- Latest npm run check after local persistence: host/UI/native-harness TypeScript, ESLint, 9 test files / 42 tests and production build passed.
 - New release regressions cover changed npm manifests during approval, unsaved new-file editors, full-capacity undo, Windows CRLF saved hashes/revert, and real Git status/diff filtering from a nested workspace.
 - Versioned packaging now validates its inventory, omits source maps, and writes SHA-256 and package-report files. Windows/Linux CI is configured locally but has not run on GitHub.
 - Tests cover endpoint/message validation, streaming UTF-8/NDJSON, cancellation, model discovery, context bounds, workspace ignores/traversal/device names, binary/link exclusions, literal search, schema decisions, loop/refusal stops, approval request IDs/cancellation, command allowlists, diff refusal/stale/dirty-file checks, patch path checks and semantic ranking/stale entries.
+- Persistence tests verify conversation, vector and undo-record reloads, 100-conversation retention, workspace/model isolation, and undo after reopening storage.
 - The real HTTP transport test uses a loopback protocol fixture, not a model.
 - npm run smoke:agent passed with the installed qwen2.5-coder:3b: model selected read_file, inspected a temporary TypeScript fixture and explained its actual hello = 42 content over two decision steps. This is a read-tool smoke test, not an autonomous coding benchmark.
 - Real local chat inference also passed earlier.
@@ -21,4 +22,4 @@ Latest Plan/Agent UI, approval cards, diff acceptance/rejection, Stop, revert an
 
 ## Scope
 
-A bounded agent preview, not production readiness or complete master-prompt parity. Single-file approval; no partial-hunk selection. Session-only history/backups/index. No durable SQLite metadata, Tree-sitter grammar index, ripgrep acceleration, automatic Git mutations or deployment. Filesystem race and script-execution caveats are documented in SECURITY.md.
+A bounded agent preview, not production readiness or complete master-prompt parity. Single-file approval; no partial-hunk selection. Persistence tests cover conversations (latest 100 per workspace), semantic vectors and the last 20 undo records in VS Code extension storage. Stored data is unencrypted local JSON; this is not SQLite. Tree-sitter grammar index, ripgrep acceleration, automatic Git mutations or deployment are not implemented. Filesystem race and script-execution caveats are documented in SECURITY.md.

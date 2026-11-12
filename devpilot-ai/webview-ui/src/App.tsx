@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Code2, Plus, Settings, RefreshCw, Send, Square } from 'lucide-react';
+import { Code2, Plus, Settings, RefreshCw, Send, Square, Trash2 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import type { ChatMessage } from '../../src/types';
@@ -8,8 +8,8 @@ declare function acquireVsCodeApi(): { postMessage(value: unknown): void; getSta
 const vscode = acquireVsCodeApi();
 const saved = vscode.getState();
 const initialDraft = saved && typeof saved === 'object' && 'draft' in saved && typeof saved.draft === 'string' ? saved.draft : '';
-interface State { approval?:{id:string;title:string;action:string}; messages: ChatMessage[]; models: string[]; model: string; error: string; connected: boolean; busy: boolean; trusted: boolean; mode:'chat'|'plan'|'agent'; timeline:{name:string;status:string}[]; canExecutePlan:boolean; usage?: {prompt?: number; completion?: number} }
-const initial: State = {messages:[],models:[],model:'',error:'',connected:false,busy:false,trusted:false,mode:'chat',timeline:[],canExecutePlan:false};
+interface State { approval?:{id:string;title:string;action:string}; messages: ChatMessage[]; models: string[]; model: string; error: string; connected: boolean; busy: boolean; trusted: boolean; mode:'chat'|'plan'|'agent'; timeline:{name:string;status:string}[]; canExecutePlan:boolean; usage?: {prompt?: number; completion?: number}; conversations:{id:string;title:string;updatedAt:number}[]; activeConversationId?:string }
+const initial: State = {messages:[],models:[],model:'',error:'',connected:false,busy:false,trusted:false,mode:'chat',timeline:[],canExecutePlan:false,conversations:[]};
 function CodeBlock({children}: {children?: React.ReactNode}) {
   const ref = useRef<HTMLPreElement>(null);
   const [copied,setCopied] = useState(false);
@@ -35,7 +35,7 @@ export function App() {
     vscode.postMessage({type:'send',text:draft}); setDraft(''); setNotice('');
   };
   return <main className="flex h-screen flex-col">
-    <header className="flex items-center gap-3 border-b p-4"><Code2 size={23}/><div className="brand">DevPilot <span>AI</span></div><div className="grow"/><button title="New conversation" aria-label="New conversation" onClick={() => vscode.postMessage({type:'newConversation'})}><Plus size={17}/></button><button title="Open settings" aria-label="Open settings" onClick={() => vscode.postMessage({type:'openSettings'})}><Settings size={17}/></button></header>
+    <header className="flex items-center gap-3 border-b p-4"><Code2 size={23}/><div className="brand">DevPilot <span>AI</span></div><select className="conversation-select" aria-label="Saved conversations" title="Saved conversations" value={state.activeConversationId ?? ''} disabled={state.busy} onChange={event => { if(event.target.value) vscode.postMessage({type:'selectConversation',id:event.target.value}); }}><option value="">New conversation</option>{state.conversations.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select><div className="grow"/><button title="Delete conversation" aria-label="Delete conversation" disabled={state.busy || !state.activeConversationId} onClick={() => state.activeConversationId && vscode.postMessage({type:'deleteConversation',id:state.activeConversationId})}><Trash2 size={17}/></button><button title="New conversation" aria-label="New conversation" onClick={() => vscode.postMessage({type:'newConversation'})}><Plus size={17}/></button><button title="Open settings" aria-label="Open settings" onClick={() => vscode.postMessage({type:'openSettings'})}><Settings size={17}/></button></header>
     <div className="model-row"><span className={'dot ' + (state.connected ? 'online' : '')}/><label htmlFor="model" className="sr-only">Local model</label><select id="model" value={state.model} disabled={state.busy || !state.models.length} onChange={e => vscode.postMessage({type:'selectModel',model:e.target.value})}>{!state.models.length && <option value="">No models connected</option>}{state.models.map(model => <option key={model}>{model}</option>)}</select><button title="Refresh Ollama connection" aria-label="Refresh Ollama connection" disabled={state.busy} onClick={() => vscode.postMessage({type:'refresh'})}><RefreshCw size={15}/></button></div>
     <section className="welcome grow" aria-label="Conversation">
       {!state.messages.length && <><div className="emblem"><Code2 size={30}/></div><p className="eyebrow">YOUR LOCAL CODING COMPANION</p><h1>Build on your<br/>own terms.</h1><p className="muted">Your Code. Your Machine. Your AI.</p><div className="card"><div><strong>Local chat is ready</strong><p>Start Ollama, refresh the connection and choose an installed model. Ask in Hindi or English. Choose Plan to inspect the workspace, or Agent to propose approved changes. All commands require approval.</p></div></div><p className="privacy">Chat sends messages only. Plan/Agent can retrieve allowed project files for local Ollama. No telemetry.</p></>}

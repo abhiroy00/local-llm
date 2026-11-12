@@ -22,6 +22,19 @@ it('honors nested ignores and returns bounded text search results', async () => 
   expect((await ws.files()).files).toContain('src/ok.ts'); expect((await ws.files()).files).not.toContain('src/hidden.ts');
   expect(await ws.search('hello',false,new AbortController().signal)).toMatchObject({matches:[{file:'src/ok.ts',line:1}]});
 });
+it('keeps user exclusions authoritative and anchors root .gitignore patterns', async () => {
+  await fs.writeFile(path.join(root,'.gitignore'),'!visible.ts\n/anchored\n');
+  await fs.mkdir(path.join(root,'sub'));
+  await fs.writeFile(path.join(root,'visible.ts'),'x');
+  await fs.writeFile(path.join(root,'kept.ts'),'x');
+  await fs.writeFile(path.join(root,'anchored'),'x');
+  await fs.writeFile(path.join(root,'sub','anchored'),'x');
+  const ws = new WorkspaceService(root,['*.ts']);
+  await expect(ws.resolve('visible.ts',true)).rejects.toThrow('excluded');
+  await expect(ws.resolve('anchored',true)).rejects.toThrow('excluded');
+  await expect(ws.resolve('sub/anchored',true)).resolves.toBeTruthy();
+  expect((await ws.files()).files).toEqual(['.gitignore','sub/anchored']);
+});
 it('rejects a junction escaping the workspace', async () => {
   const outside = await fs.mkdtemp(path.join(os.tmpdir(),'devpilot-outside-'));
   try { await fs.symlink(outside,path.join(root,'link'),'junction'); await expect(new WorkspaceService(root).resolve('link/file',true)).rejects.toThrow('Symlinks'); }

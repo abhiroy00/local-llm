@@ -3,16 +3,27 @@ import { createHash, randomUUID } from 'node:crypto';
 import { createTwoFilesPatch, applyPatch, parsePatch } from 'diff';
 import { promises as fs } from 'node:fs';
 import { WorkspaceService } from '../services/WorkspaceService';
+import { PersistenceService, type UndoRecord } from '../services/PersistenceService';
 import type { ApprovalFunction } from '../security/ApprovalService';
 
 export const fingerprint = (text: string): string => createHash('sha256').update(text).digest('hex');
 export class FileEditor implements vscode.Disposable {
   private previews = new Map<string,string>();
-  private backups: {path:string;before:string | undefined;after:string | undefined}[] = [];
+  private backups: UndoRecord[] = [];
+  private backupsLoaded=false;
   private registration = vscode.workspace.registerTextDocumentContentProvider('devpilot-preview',{provideTextDocumentContent: uri => this.previews.get(uri.toString()) ?? ''});
-  constructor(private readonly workspace: WorkspaceService,private readonly approve?:ApprovalFunction) {}
+  constructor(private readonly workspace: WorkspaceService,private readonly approve?:ApprovalFunction,private readonly persistence?:PersistenceService,private readonly workspaceId='') {}
+  private async loadBackups():Promise<void> {
+    if(this.backupsLoaded) return;
+    if(this.persistence) this.backups=await this.persistence.loadUndoRecords(this.workspaceId);
+    this.backupsLoaded=true;
+  }
+  private async saveBackups():Promise<void> {
+    if(this.persistence) await this.persistence.saveUndoRecords(this.workspaceId,this.backups);
+  }
   async change(file: string, content: string | undefined, expectedHash: string | undefined, signal: AbortSignal,recordBackup=true): Promise<unknown> {
     if (!vscode.workspace.isTrusted) throw new Error('Workspace trust required.');
+    if(recordBackup) await this.loadBackups();
     signal.throwIfAborted();
     const target = await this.workspace.resolve(file,true); const uri = vscode.Uri.file(target);
     const hasDirtyEditor=()=>vscode.workspace.textDocuments.some(document=>document.uri.toString()===uri.toString() && document.isDirty);
@@ -46,7 +57,11 @@ export class FileEditor implements vscode.Disposable {
       if (!await vscode.workspace.applyEdit(edit)) throw new Error('VS Code could not apply the change.');
       if (content !== undefined) { const changed = await vscode.workspace.openTextDocument(uri); if (!await changed.save()) throw new Error('Change applied in editor but saving failed; inspect the file.'); }
       const after=content === undefined ? undefined : await this.workspace.read(file);
-      if(recordBackup) { this.backups.push({path:file,before,after}); this.backups = this.backups.slice(-20); }
+      if(recordBackup) {
+        this.backups.push({path:file,before,after}); this.backups = this.backups.slice(-20);
+        try { await this.saveBackups(); }
+        catch(error) { throw new Error(`Change applied to ${file}, but its undo record could not be saved: ${error instanceof Error ? error.message : 'Storage failed.'}`); }
+      }
       return {applied:true,file,hash:after === undefined ? undefined : fingerprint(after),diff:createTwoFilesPatch(file,file,before ?? '',after ?? '').slice(0,8000)};
     } finally { this.previews.delete(left.toString()); this.previews.delete(right.toString()); }
   }
@@ -59,9 +74,14 @@ export class FileEditor implements vscode.Disposable {
     return this.change(file,after,expectedHash,signal);
   }
   async revert(signal: AbortSignal): Promise<unknown> {
+    await this.loadBackups();
     const backup = this.backups.at(-1); if (!backup) throw new Error('No session changes to revert.');
     const result = await this.change(backup.path,backup.before,backup.after === undefined ? undefined : fingerprint(backup.after),signal,false);
-    if(result && typeof result === 'object' && 'applied' in result && result.applied === true) this.backups.pop();
+    if(result && typeof result === 'object' && 'applied' in result && result.applied === true) {
+      this.backups.pop();
+      try { await this.saveBackups(); }
+      catch(error) { throw new Error(`Change reverted, but its undo record could not be cleared: ${error instanceof Error ? error.message : 'Storage failed.'}`); }
+    }
     return result;
   }
   dispose(): void { this.registration.dispose(); this.previews.clear(); this.backups = []; }

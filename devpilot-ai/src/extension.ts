@@ -1,8 +1,10 @@
 import * as vscode from 'vscode';
 import { ChatViewProvider } from './providers/ChatViewProvider';
+import { PersistenceService } from './services/PersistenceService';
 
-export function activate(context: vscode.ExtensionContext): void {
-  const provider = new ChatViewProvider(context.extensionUri);
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  const persistence = await PersistenceService.open(context.globalStorageUri.fsPath);
+  const provider = new ChatViewProvider(context.extensionUri,persistence);
   context.subscriptions.push(
     provider,
     vscode.commands.registerCommand('devpilot.indexWorkspace',() => provider.indexWorkspace()),

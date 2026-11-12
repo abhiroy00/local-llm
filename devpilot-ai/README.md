@@ -8,13 +8,13 @@ Version 0.3.1 is a local-first agent preview with release-hardening fixes. Start
 - Plan: read/search allowed workspace files and propose a plan.
 - Agent: bounded multi-step tasks with per-file diff approval and separate command approval.
 
-Use Execute Plan after reviewing a plan. Stop cancels future work; earlier edits remain. Revert Last Change previews a session revert. Keep Git backups. Small models work best on narrow tasks.
+Use Execute Plan after reviewing a plan. Stop cancels future work; earlier edits remain. Revert Last Change previews a workspace-scoped undo record that survives restarts. Saved conversations can be selected or deleted; up to 100 are retained per workspace. Keep Git backups. Small models work best on narrow tasks.
 
 16 validated tools cover listing/reading/search, symbols, dependencies, workspace info, create/edit/patch/delete, commands/tests, Git status/diff and optional semantic retrieval. Tools require workspace trust. Paths target the active editor's workspace folder, otherwise the first folder. Index Workspace builds an allowed-file inventory.
 
 Limits: 8 agent steps; duplicate detection; 2-minute model calls; 10-minute task deadline; commands time out at 60 seconds. Reads are UTF-8 up to 128 KiB, with tool excerpts capped at 12000 characters. Listing caps at 1500 files/10000 entries; text search scans up to 200 files/30 matches. Secret filename rules and ignore/link checks apply; arbitrary source text is not automatically redacted.
 
-Optional devpilot.embeddingModel uses a separately installed embedding model, at most 48 files/1800 characters per file in session memory. No model is downloaded automatically.
+Optional devpilot.embeddingModel uses a separately installed embedding model, at most 48 files/1800 characters per file; vectors persist locally per workspace and model. Conversation text, vectors, and undo contents are stored unencrypted in VS Code extension storage. No model is downloaded automatically.
 
 ## Development
 

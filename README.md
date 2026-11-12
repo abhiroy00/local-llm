@@ -6,10 +6,13 @@ The DevPilot AI 0.3 agent preview is in [devpilot-ai](devpilot-ai/README.md): lo
 
 ## Development
 
+From the repository root:
+
 ```sh
-cd devpilot-ai
-npm ci
-npm run check
+npm ci        # installs the extension's dependencies; skipped when node_modules already matches devpilot-ai/package-lock.json
+npm run check # typecheck, lint, tests and build
 ```
+
+The root `package.json` has no dependencies of its own; its scripts delegate to `devpilot-ai/` with `npm --prefix`. Running `npm ci` and the scripts inside `devpilot-ai` directly still works. Other scripts: `npm test`, `npm run build`, `npm run package`, `npm run test:host`, `npm run smoke:agent`.
 
 Open either this repository root or the `devpilot-ai` folder in VS Code. In Run and Debug, select **Run DevPilot AI** and press F5 to launch the extension development host. Both folders include matching launch configurations. See the project documentation for implemented features and pending verification.

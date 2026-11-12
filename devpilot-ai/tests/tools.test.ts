@@ -5,6 +5,7 @@ import path from 'node:path';
 import { workspace, window, commands } from './vscode.mock';
 import { FileEditor, fingerprint } from '../src/tools/FileEditor';
 import { WorkspaceService } from '../src/services/WorkspaceService';
+import { PersistenceService, workspaceKey } from '../src/services/PersistenceService';
 import { ToolRegistry } from '../src/tools/ToolRegistry';
 import { approvedTerminal, runProcess } from '../src/tools/Terminal';
 import { execFile } from 'node:child_process';
@@ -99,6 +100,41 @@ it('returns the saved CRLF hash and reverts using the saved rather than proposed
     expect(await editor.change('a.ts','after\n',fingerprint('before'),signal())).toMatchObject({applied:true,hash:fingerprint('after\r\n')});
     expect(await editor.revert(signal())).toMatchObject({applied:true});expect(await fs.readFile(target,'utf8')).toBe('before');
   } finally {editor.dispose();workspace.applyEdit.mockResolvedValue(true);}
+});
+it('restores approved undo records after reopening persistent storage',async()=>{
+  const storage=await fs.mkdtemp(path.join(os.tmpdir(),'devpilot-state-'));
+  const target=path.join(root,'a.ts');let content='before';
+  workspace.openTextDocument.mockImplementation(async()=>({isDirty:false,version:1,positionAt:()=>({line:0,character:0}),getText:()=>content,save:async()=>{await fs.writeFile(target,content);return true;}}));
+  workspace.applyEdit.mockImplementation(async(edit:unknown)=>{
+    const replacement=(edit as {changes:unknown[][]}).changes.find(change=>change[0]==='replace');
+    if(replacement) {content=replacement[3] as string;await fs.writeFile(target,content);} return true;
+  });
+  try {
+    const workspaceId=workspaceKey(root);
+    const editor=new FileEditor(new WorkspaceService(root),async()=>true,await PersistenceService.open(storage),workspaceId);
+    expect(await editor.change('a.ts','after',fingerprint('before'),signal())).toMatchObject({applied:true});
+    editor.dispose();
+    const reopened=new FileEditor(new WorkspaceService(root),async()=>true,await PersistenceService.open(storage),workspaceId);
+    expect(await reopened.revert(signal())).toMatchObject({applied:true});
+    expect(await fs.readFile(target,'utf8')).toBe('before');
+    reopened.dispose();
+  } finally { await fs.rm(storage,{recursive:true,force:true});workspace.applyEdit.mockResolvedValue(true); }
+});
+it('keeps Git status codes plus rename and delete entries while filtering secret files',async()=>{
+  const git=promisify(execFile);
+  await git('git',['init',root]);
+  await git('git',['-C',root,'config','user.email','probe@example.com']);await git('git',['-C',root,'config','user.name','probe']);
+  const nested=path.join(root,'sub');await fs.mkdir(nested);
+  await fs.writeFile(path.join(nested,'code.ts'),'before\n');await fs.writeFile(path.join(nested,'old.ts'),'rename\n');
+  await fs.writeFile(path.join(nested,'gone.ts'),'gone\n');await fs.writeFile(path.join(nested,'.env'),'TEST_SECRET=fixture\n');
+  await git('git',['-C',root,'add','-A']);await git('git',['-C',root,'commit','-m','init']);
+  await fs.writeFile(path.join(nested,'code.ts'),'after\n');await fs.writeFile(path.join(nested,'.env'),'TEST_SECRET=changed_fixture\n');
+  await fs.unlink(path.join(nested,'gone.ts'));await git('git',['-C',root,'mv','sub/old.ts','sub/new.ts']);
+  const allowed=new WorkspaceService(nested);
+  const status=await approvedTerminal(nested,'git',['status'],signal(),async()=>true,allowed) as {output:string};
+  expect(status.output).toContain('M code.ts');expect(status.output).toContain('D gone.ts');expect(status.output).toContain('old.ts -> new.ts');expect(status.output).not.toContain('.env');
+  const diff=await approvedTerminal(nested,'git',['diff'],signal(),async()=>true,allowed) as {output:string};
+  expect(diff.output).toContain('gone.ts');expect(diff.output).toContain('deleted file mode');expect(diff.output).not.toContain('TEST_SECRET');
 });
 it('reports Git changes inside a nested workspace while filtering secret files',async()=>{
   const git=promisify(execFile);

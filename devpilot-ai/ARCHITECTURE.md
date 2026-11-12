@@ -10,4 +10,4 @@ ToolSchemas describes 16 tools, schemas and policies. ToolRegistry validates and
 
 Terminal restricts commands, previews npm scripts/hooks and terminates process trees on timeout/cancellation. Git output is filtered; external diff/textconv/fsmonitor are disabled.
 
-Optional SemanticIndex uses local embeddings, stale hashes and cosine ranking. Vectors/history/reverts are ephemeral; drafts use VS Code state. SQLite persistence, Tree-sitter grammars and ripgrep acceleration remain scale improvements. No syntax-aware whole-repository database is claimed.
+Optional SemanticIndex uses local embeddings, stale hashes and cosine ranking. A validated, atomic local JSON store in VS Code extension storage retains up to 100 conversations per workspace, bounded semantic vectors per workspace/model and the last 20 workspace-scoped undo records. Drafts still use VS Code state. Data is unencrypted and remains on the local machine. SQLite, Tree-sitter grammars and ripgrep acceleration remain deferred scale improvements. No syntax-aware whole-repository database is claimed.
