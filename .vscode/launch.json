@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run DevPilot AI",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}/devpilot-ai"],
+      "outFiles": ["${workspaceFolder}/devpilot-ai/dist/**/*.js"],
+      "preLaunchTask": "build DevPilot AI"
+    }
+  ]
+}

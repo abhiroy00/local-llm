@@ -1,7 +1,13 @@
 # Architecture
 
-`src/extension.ts` registers the view and three functional commands. `ChatViewProvider` owns webview lifecycle, message validation, workspace trust reporting and static asset access. `src/types` defines the explicit host message boundary.
+ChatViewProvider owns session history, modes, cancellation and workspace-scoped tools. React displays streamed Markdown/code, selectors and a task timeline. OllamaService makes local-only host requests and parses bounded NDJSON.
 
-`webview-ui/src` contains React UI and Tailwind CSS with VS Code theme variables. The UI persists only a task draft through VS Code webview state. No secrets or source files are collected. esbuild bundles the host with `vscode` external and builds a self-contained webview; PostCSS compiles Tailwind.
+AgentService uses JSON-schema constrained tool/final decisions with Zod validation. Recent results are bounded; the whole repository is never assembled into a prompt. Step limits, duplicate detection and deadlines constrain work. Host-generated execution records distinguish actual edits/test exits from model prose.
 
-The host currently performs no network calls or workspace mutations. Future service, tool, security, context and indexing modules will be added when implemented rather than populated with empty service stubs. SQLite, Tree-sitter and embedding dependencies are deferred until the associated phase has measured requirements. No model runtime or background service is started.
+WorkspaceService enforces paths, device-name restrictions, nested ignores, text limits and link exclusions. Search/listing run in-process with strict limits. Symbols use VS Code language providers. Tasks target one root.
+
+ToolSchemas describes 16 tools, schemas and policies. ToolRegistry validates and dispatches calls. Plan blocks mutations/processes independently of model output. FileEditor previews virtual diffs, checks hashes/document versions/dirty state, applies WorkspaceEdit, saves and keeps 20 session revert records. Patches are exact and single-file.
+
+Terminal restricts commands, previews npm scripts/hooks and terminates process trees on timeout/cancellation. Git output is filtered; external diff/textconv/fsmonitor are disabled.
+
+Optional SemanticIndex uses local embeddings, stale hashes and cosine ranking. Vectors/history/reverts are ephemeral; drafts use VS Code state. SQLite persistence, Tree-sitter grammars and ripgrep acceleration remain scale improvements. No syntax-aware whole-repository database is claimed.

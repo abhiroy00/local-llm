@@ -1,8 +1,8 @@
 {
   "name": "devpilot-ai",
   "displayName": "DevPilot AI",
-  "description": "Your Code. Your Machine. Your AI. Local-first coding assistant foundation.",
-  "version": "0.1.0",
+  "description": "Local-first coding agent with approved workspace tools and Ollama chat.",
+  "version": "0.3.1",
   "publisher": "devpilot",
   "engines": {
     "vscode": "^1.95.0"
@@ -27,6 +27,30 @@
       {
         "command": "devpilot.openSettings",
         "title": "DevPilot AI: Open Settings"
+      },
+      {
+        "command": "devpilot.indexWorkspace",
+        "title": "DevPilot AI: Index Workspace"
+      },
+      {
+        "command": "devpilot.reviewProject",
+        "title": "DevPilot AI: Review Project"
+      },
+      {
+        "command": "devpilot.explainCode",
+        "title": "DevPilot AI: Explain Code"
+      },
+      {
+        "command": "devpilot.fixCode",
+        "title": "DevPilot AI: Fix Selected Code"
+      },
+      {
+        "command": "devpilot.generateTests",
+        "title": "DevPilot AI: Generate Tests"
+      },
+      {
+        "command": "devpilot.revertChange",
+        "title": "DevPilot AI: Revert Last Change"
       }
     ],
     "viewsContainers": {
@@ -53,30 +77,73 @@
         "devpilot.ollamaEndpoint": {
           "type": "string",
           "default": "http://localhost:11434",
-          "description": "Ollama endpoint for the upcoming inference integration."
+          "description": "Local Ollama server. Only localhost, 127.0.0.1 and ::1 are accepted; redirects are blocked.",
+          "scope": "machine"
         },
         "devpilot.contextLimit": {
           "type": "number",
           "default": 4096,
           "minimum": 1024,
           "maximum": 32768,
-          "description": "Context budget for future model requests."
+          "description": "Ollama context window. Recent chat is bounded using a conservative character estimate, with output budget reserved."
+        },
+        "devpilot.ignorePatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Additional gitignore-style workspace exclusion patterns."
+        },
+        "devpilot.embeddingModel": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Optional installed embedding model for bounded semantic file retrieval. Empty disables embeddings; no model is downloaded."
         }
       }
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "command": "devpilot.explainCode",
+          "group": "devpilot",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "devpilot.fixCode",
+          "group": "devpilot",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "devpilot.generateTests",
+          "group": "devpilot",
+          "when": "editorHasSelection"
+        }
+      ]
     }
   },
   "scripts": {
     "build": "node build.mjs",
-    "typecheck": "tsc --noEmit && tsc -p webview-ui/tsconfig.json --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p webview-ui/tsconfig.json --noEmit && tsc -p tsconfig.host.json --noEmit",
     "lint": "eslint src webview-ui/src tests",
     "test": "vitest run",
     "check": "npm run typecheck && npm run lint && npm test && npm run build",
-    "vscode:prepublish": "npm run build"
+    "vscode:prepublish": "npm run build",
+    "package": "node scripts/package.mjs",
+    "smoke:agent": "node scripts/run-agent-smoke.mjs",
+    "test:host": "node scripts/run-host-tests.mjs"
   },
   "dependencies": {
+    "diff": "^9.0.0",
+    "highlight.js": "^11.12.0",
+    "ignore": "^7.0.14",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
@@ -84,6 +151,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/vscode": "^1.95.0",
+    "@vscode/vsce": "^4.1.0",
     "esbuild": "^0.28.2",
     "eslint": "^10.14.0",
     "postcss": "^8.0.0",
@@ -91,5 +159,11 @@
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.72.2",
     "vitest": "^5.1.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/abhiroy00/local-llm.git",
+    "directory": "devpilot-ai"
+  },
+  "license": "MIT"
 }

@@ -1,0 +1,41 @@
+name: DevPilot checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: devpilot-ai
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: devpilot-ai/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm audit --omit=dev
+      - run: npm run package
+      - uses: actions/upload-artifact@v7
+        with:
+          name: devpilot-${{ matrix.os }}
+          path: |
+            devpilot-ai/artifacts/*.vsix
+            devpilot-ai/artifacts/*.sha256
+            devpilot-ai/artifacts/package-report.json
+          if-no-files-found: error
+          retention-days: 14

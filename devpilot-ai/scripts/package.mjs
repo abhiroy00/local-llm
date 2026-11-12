@@ -1,0 +1,17 @@
+import { createVSIX, listFiles, PackageManager } from '@vscode/vsce';
+import { readFile,mkdir,writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import path from 'node:path';
+const manifest=JSON.parse(await readFile('package.json','utf8'));
+if(!/^[a-z0-9-]+$/.test(manifest.name)||!/^\d+\.\d+\.\d+(?:-[a-z0-9.-]+)?$/.test(manifest.version)) throw new Error('Invalid package name/version.');
+await import('../build.mjs');
+const files=(await listFiles({packageManager:PackageManager.None})).map(file=>file.replaceAll('\\','/'));
+for(const required of ['package.json','dist/extension.js','dist/webview.js','dist/webview.css','resources/icon.svg']) if(!files.includes(required)) throw new Error('Missing package asset: '+required);
+for(const file of files) if(/(^|\/)(node_modules|src|tests|scripts|artifacts)(\/|$)|\.env|(?:smoke|tests)\.cjs$|\.map$/.test(file)) throw new Error('Unexpected development/sensitive package file: '+file);
+await mkdir('artifacts',{recursive:true});
+const packagePath=path.join('artifacts',`${manifest.name}-${manifest.version}.vsix`);
+await createVSIX({packagePath,dependencies:false});
+const buffer=await readFile(packagePath);const sha256=createHash('sha256').update(buffer).digest('hex');
+await writeFile(packagePath+'.sha256',`${sha256}  ${path.basename(packagePath)}\n`);
+await writeFile(path.join('artifacts','package-report.json'),JSON.stringify({version:manifest.version,packagePath,bytes:buffer.length,sha256,files},null,2)+'\n');
+console.log(`Verified package inventory and SHA-256: ${packagePath}`);

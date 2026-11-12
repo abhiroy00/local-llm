@@ -5,4 +5,11 @@ tests/**
 .vscode/**
 *.mjs
 tsconfig.json
+tsconfig.host.json
 package-lock.json
+scripts/**
+artifacts/**
+vitest.config.*
+dist/*smoke*
+dist/*tests*
+dist/**/*.map

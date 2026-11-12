@@ -1,19 +1,21 @@
 # Development
 
-## Environment inspected
+Initial environment: Windows, Node 22.21.0, npm 10.9.4, Git 2.51.1, VS Code 1.145.1, Intel i5-1340P / Iris Xe. Ollama was subsequently installed/started by the user; qwen2.5-coder:3b was installed with user authorization.
 
-- Node.js 22.21.0; npm 10.9.4; Git 2.51.1.windows.1.
-- VS Code 1.145.1 x64 available through `code`.
-- CPU: 13th Gen Intel Core i5-1340P; GPU: Intel Iris Xe Graphics.
-- Ollama CLI absent from PATH; `http://localhost:11434/api/tags` did not respond during inspection.
-- Workspace initially empty at implementation time. No existing implementation or dependencies were replaced.
+## Checks
 
-## Commands
+- npm run check: TypeScript, lint, unit/protocol tests and build.
+- npm run smoke:agent: real installed Qwen read-tool task against a temporary fixture.
+- npm run test:host: isolated Extension Host integration. Auto-detects standard Windows Code.exe, or set VSCODE_EXECUTABLE. Builds current code and tests real editor create/edit/revert with a fixture-only approval callback; this does not test clicking UI approval cards. Uses an isolated profile/workspace, leaving normal profile trust unchanged. Failure logs/status are retained under the printed temporary folder.
+- npm run package: versioned VSIX, SHA-256 and inventory report in artifacts; checks required assets and development-file exclusions.
+- GitHub Actions: Windows/Linux Node 22 checks, production dependency audit and packaging are configured in the repository workflow. Remote execution has not been verified; no model download or inference job runs in CI. Action usage follows the official checkout/setup-node/upload-artifact repositories.
 
-`npm run build` bundles host, React and CSS. `npm run typecheck` checks both TypeScript projects. `npm run lint` runs ESLint. `npm test` tests the host message boundary. `npm run check` runs all four.
+## Manual checklist
 
-## Manual Extension Host verification
+Open the root or extension folder, select Run DevPilot AI and press F5. Open the intended local project in the host. Check narrow widths, light/dark themes, keyboard focus, draft persistence, new conversation, model refresh and settings.
 
-Open this project and press F5. Check Activity Bar icon, sidebar rendering at narrow widths, keyboard focus, both light/dark themes, and restricted workspace indicator. Type a draft, hide/reopen the view, and confirm it survives. New Conversation must clear it. Open Settings must filter to DevPilot AI. Confirm all three Command Palette commands work. Use Developer: Toggle Developer Tools to inspect CSP or runtime errors.
+Chat: Hindi/English streaming, code copy, Stop and regenerate. Plan: inspect package.json, verify file references and confirm that no changes/processes occur. Execute Plan: inspect each full diff and approve/reject in the sidebar card. Rejection must stop the agent. Edit a file while its approval is pending: applying must fail as stale. Unsaved editor changes must be rejected. Revert must preview the inverse diff and require approval.
 
-Automated tests do not substitute for an Extension Host smoke test. See VALIDATION.md for the actual verification status.
+Agent: use a throwaway project, approve a create/edit and then a relevant test command; inspect test exit/output and host execution record. Cancel during generation/approval/process execution; earlier changes remain. Verify ignored/secret/link files cannot be read. Inspect Git status/diff filtering. Test optional embeddings only with a separately installed compatible model.
+
+Native host validation is blocked by the pending VS Code updater lock in this session. See VALIDATION.md for actual evidence and remaining limits.

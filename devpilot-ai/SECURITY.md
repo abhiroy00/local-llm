@@ -1,7 +1,13 @@
 # Security
 
-Phase 1 makes no inference requests, downloads no models, runs no terminal commands and modifies no workspace files. There is no telemetry. Task drafts are retained locally in VS Code webview state; avoid entering secrets.
+No telemetry or automatic model downloads. Chat sends messages to local Ollama; Plan/Agent can send allowed source excerpts and approved command output. Only localhost/127.0.0.1/::1 HTTP(S) origins are accepted without credentials, paths, query strings or redirects. Ollama's own routing/storage is managed separately.
 
-Webview scripts require a random nonce. Remote resources and connections are blocked by CSP. Only bundled dist resources are accessible. Incoming message types are allowlisted; React renders draft text without HTML injection. Workspace trust is shown and updated when granted, but no privileged tools exist in this phase.
+Tools require a trusted local folder. Plan cannot mutate or spawn. Decisions/arguments are schema-validated. Unknown tools, traversal, Windows device names/alternate streams, secret filename patterns, ignored files and symbolic/hard links are rejected. Filename exclusions do not guarantee arbitrary source or command output is free of credentials.
 
-Future tools must require workspace trust, validate input/output, enforce realpath and symlink boundaries, exclude secrets, enforce limits and request explicit approval before edits or commands. Locally hosted model outputs remain untrusted. These future protections are requirements, not claims of implemented tool security.
+Each file change opens a native diff and requires a matching sidebar approval card. Approval IDs and cancellation prevent stale decisions. Dirty/hash/version checks reject stale edits. Stop does not undo earlier edits. Revert requires approval and retains 20 session records only. A save failure may leave an unsaved editor change. Approval is for a complete one-file proposal; partial-hunk selection is not implemented. Keep Git backups.
+
+Commands are allowlisted, previewed and approved separately. Approved scripts/tests execute project code and can modify files or use networks: this is not an OS sandbox. npm scripts/hooks are previewed. Git commit/push/reset and destructive commands are unavailable. Git output is filtered to allowed files.
+
+CSP uses a random nonce. Raw model HTML is not executed; links/images are inert. Audit UI stores names/status, not source/output. History, vectors and reverts are session memory; drafts persist in VS Code state.
+
+Known limit: checks cannot guarantee race-free access against another malicious local process swapping directory entries. Concurrent edits, root switching and process termination need wider platform testing. This preview is not a hardened sandbox for adversarial repositories or a deployment tool.
