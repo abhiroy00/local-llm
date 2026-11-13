@@ -1,4 +1,5 @@
 import type { ChatMessage } from '../types';
+import { redactSecrets } from '../security/SecretRedactor';
 
 export function localEndpoint(endpoint: string): string {
   const url = new URL(endpoint);
@@ -39,15 +40,21 @@ export class OllamaService {
     return response;
   }
   async models(signal?: AbortSignal): Promise<string[]> {
-    const timeout = AbortSignal.timeout(8000);
+    const timeout = AbortSignal.timeout(30000);
     const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
     // Retry only the idempotent discovery request, never a generation.
-    let response: Response;
-    try { response = await this.request('/api/tags', {signal:combined}); }
-    catch (error) { if (combined.aborted) throw error; response = await this.request('/api/tags', {signal:combined}); }
-    const data = await response.json();
-    if (!Array.isArray(data.models) || data.models.some((m: { name?: unknown }) => !m || typeof m.name !== 'string')) throw new Error('Invalid Ollama model list.');
-    return [...new Set<string>(data.models.map((m: { name: string }) => m.name))];
+    try {
+      let response: Response;
+      try { response = await this.request('/api/tags', {signal:combined}); }
+      catch (error) { if (combined.aborted) throw error; response = await this.request('/api/tags', {signal:combined}); }
+      const data = await response.json();
+      if (!Array.isArray(data.models) || data.models.some((m: { name?: unknown }) => !m || typeof m.name !== 'string')) throw new Error('Invalid Ollama model list.');
+      return [...new Set<string>(data.models.map((m: { name: string }) => m.name))];
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      if (timeout.aborted) throw new Error('Ollama model discovery timed out after 30 seconds. Check that Ollama is running and responsive.');
+      throw error;
+    }
   }
   async embed(model:string,input:string[],signal:AbortSignal):Promise<number[][]> {
     if(input.length>16 || input.some(text=>text.length>2000)) throw new Error('Embedding batch limit exceeded.');
@@ -57,7 +64,7 @@ export class OllamaService {
     return data.embeddings;
   }
   async structured(model:string,messages:ChatMessage[],contextLimit:number,signal:AbortSignal,format:unknown = 'json'):Promise<unknown> {
-    signal = AbortSignal.any([signal,AbortSignal.timeout(120000)]);
+    // The caller owns the deadline (agent runs pass the task signal). A shorter per-call cap aborts slow local models mid-plan and surfaces an unusable transport timeout.
     if (!Number.isInteger(contextLimit) || contextLimit<1024 || contextLimit>32768) throw new Error('Invalid context limit.');
     if (messages.reduce((total,m) => total+m.content.length,0)>contextLimit*3) throw new Error('Agent protocol exceeds context budget. Increase Context Limit.');
     const response = await this.request('/api/chat',{method:'POST',signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({model,messages,stream:true,format,keep_alive:'2m',options:{num_ctx:contextLimit,num_predict:Math.min(4096,Math.floor(contextLimit/2)),temperature:0}})});
@@ -69,7 +76,8 @@ export class OllamaService {
   }
   async chat(model: string, messages: ChatMessage[], contextLimit: number, signal: AbortSignal, onText: (text: string) => void): Promise<{prompt?: number; completion?: number}> {
     if (!Number.isInteger(contextLimit) || contextLimit < 1024 || contextLimit > 32768) throw new Error('Context Limit must be between 1024 and 32768.');
-    const response = await this.request('/api/chat', {method:'POST',signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({model,messages:boundedContext(messages,contextLimit),stream:true,keep_alive:'2m',options:{num_ctx:contextLimit,num_predict:Math.floor(contextLimit / 2)}})});
+    const safeMessages=boundedContext(messages,contextLimit).map(message=>({role:message.role,content:redactSecrets(message.content).text}));
+    const response = await this.request('/api/chat', {method:'POST',signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({model,messages:safeMessages,stream:true,keep_alive:'2m',options:{num_ctx:contextLimit,num_predict:Math.floor(contextLimit / 2)}})});
     if (!response.body) throw new Error('Ollama returned no response stream.');
     const reader = response.body.getReader();
     const decoder = new TextDecoder();

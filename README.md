@@ -16,3 +16,5 @@ npm run check # typecheck, lint, tests and build
 The root `package.json` has no dependencies of its own; its scripts delegate to `devpilot-ai/` with `npm --prefix`. Running `npm ci` and the scripts inside `devpilot-ai` directly still works. Other scripts: `npm test`, `npm run build`, `npm run package`, `npm run test:host`, `npm run smoke:agent`.
 
 Open either this repository root or the `devpilot-ai` folder in VS Code. In Run and Debug, select **Run DevPilot AI** and press F5 to launch the extension development host. Both folders include matching launch configurations. See the project documentation for implemented features and pending verification.
+
+Agents and new contributors should start with [AGENTS.md](AGENTS.md): architecture map, working rules, current uncommitted state and known gotchas. Change history with root causes lives in [devpilot-ai/docs/PROJECT_MEMORY.md](devpilot-ai/docs/PROJECT_MEMORY.md).

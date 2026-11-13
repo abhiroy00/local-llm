@@ -7,6 +7,7 @@ import { AgentService } from '../services/AgentService';
 import { ToolRegistry } from '../tools/ToolRegistry';
 import { ApprovalService } from '../security/ApprovalService';
 import { PersistenceService, workspaceKey, type ConversationSummary } from '../services/PersistenceService';
+import { redactSecrets } from '../security/SecretRedactor';
 
 export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
   private view?: vscode.WebviewView;
@@ -19,6 +20,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   private activeConversationId?:string;
   private conversationWorkspace?:string;
   private conversations:ConversationSummary[]=[];
+  private privacyNotice='';
   private getTools(): ToolRegistry {
     if (!vscode.workspace.isTrusted) throw new Error('Workspace tools require a trusted folder.');
     const folders = vscode.workspace.workspaceFolders;
@@ -59,7 +61,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   async revertLastChange():Promise<void> {
     if(this.active) { void vscode.window.showWarningMessage('Stop the active task before reverting.'); return; }
     const controller=new AbortController();this.active=controller;this.sendState();
-    try { await this.getTools().editor.revert(controller.signal); } catch(error) { void vscode.window.showErrorMessage(error instanceof Error ? error.message : 'Revert failed.'); } finally { if(this.active===controller) { this.active=undefined;this.sendState(); } }
+    try { await this.getTools().revertLastChange(controller.signal); } catch(error) { void vscode.window.showErrorMessage(error instanceof Error ? error.message : 'Revert failed.'); } finally { if(this.active===controller) { this.active=undefined;this.sendState(); } }
   }
   private messages: ChatMessage[] = [];
   private models: string[] = [];
@@ -70,7 +72,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   private discovery?: AbortController;
   private usage?: { prompt?: number; completion?: number };
   private sendState(): void {
-    void this.view?.webview.postMessage({type:'state',messages:this.messages,models:this.models,model:this.model,error:this.error,connected:this.connected,busy:!!this.active,approval:this.approvals.pending,mode:this.mode,timeline:this.timeline,canExecutePlan:!!this.lastPlan,usage:this.usage,trusted:vscode.workspace.isTrusted,conversations:this.conversations,activeConversationId:this.activeConversationId});
+    void this.view?.webview.postMessage({type:'state',messages:this.messages,models:this.models,model:this.model,error:this.error,connected:this.connected,busy:!!this.active,approval:this.approvals.pending,mode:this.mode,timeline:this.timeline,canExecutePlan:!!this.lastPlan,usage:this.usage,trusted:vscode.workspace.isTrusted,conversations:this.conversations,activeConversationId:this.activeConversationId,privacyNotice:this.privacyNotice});
   }
   private service(): OllamaService {
     return new OllamaService(vscode.workspace.getConfiguration('devpilot').get<string>('ollamaEndpoint','http://localhost:11434'));
@@ -139,7 +141,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   private async generate(text?: string): Promise<void> {
     if (this.active) return;
     if (!this.connected || !this.models.includes(this.model)) { this.error = 'Connect to Ollama and select an installed model first.'; this.sendState(); return; }
-    if (text) { this.lastPlan = ''; this.messages.push({role:'user',content:text}); }
+    if (text) {
+      this.lastPlan = '';
+      const safe=redactSecrets(text);
+      this.privacyNotice=safe.count ? `Redacted ${safe.count} detected credential value(s) before sending and saving.` : '';
+      this.messages.push({role:'user',content:safe.text});
+    }
     else if (this.messages.at(-1)?.role === 'assistant') this.messages.pop();
     if (this.messages.at(-1)?.role !== 'user') return;
     this.messages = this.messages.slice(-39);
@@ -223,6 +230,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }));
     this.listeners.push(view.onDidDispose(() => { this.active?.abort(); this.discovery?.abort(); this.view = undefined; }));
   }
-  reset(): void { this.active?.abort(); this.active = undefined; this.messages = []; this.activeConversationId=undefined;this.conversationWorkspace=undefined;this.timeline = []; this.lastPlan = ''; this.error = ''; this.usage = undefined; void this.view?.webview.postMessage({type:'reset'}); this.sendState(); }
+  reset(): void { this.active?.abort(); this.active = undefined; this.messages = []; this.activeConversationId=undefined;this.conversationWorkspace=undefined;this.timeline = []; this.lastPlan = ''; this.error = ''; this.privacyNotice='';this.usage = undefined; void this.view?.webview.postMessage({type:'reset'}); this.sendState(); }
   dispose(): void { this.tools?.dispose(); this.active?.abort(); this.discovery?.abort(); this.listeners.forEach(item => item.dispose()); this.listeners = []; }
 }

@@ -15,7 +15,7 @@ export const schemas = {
   search_semantic:z.object({query:z.string().min(1).max(300)}).strict(),
 };
 export type ToolName = keyof typeof schemas;
-const changeResult=z.object({applied:z.boolean(),file:z.string().optional(),reason:z.string().optional(),hash:z.string().optional(),diff:z.string().optional()});
+const changeResult=z.object({applied:z.boolean(),file:z.string().optional(),reason:z.string().optional(),hash:z.string().optional(),diff:z.string().optional(),warning:z.string().optional()});
 const commandResult=z.union([z.object({approved:z.literal(false)}),z.object({exitCode:z.number().nullable(),output:z.string().max(20000),truncated:z.boolean()})]);
 const searchResult=z.object({matches:z.array(z.object({file:z.string(),line:z.number().optional(),text:z.string().optional()})).max(30),scanned:z.number(),truncated:z.boolean()});
 export const outputSchemas = {

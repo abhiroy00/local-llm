@@ -9,7 +9,7 @@ export async function run():Promise<void> {
   const extension=vscode.extensions.getExtension('devpilot.devpilot-ai');
   assert.ok(extension,'DevPilot extension must be discoverable'); await extension.activate();
   const commands=await vscode.commands.getCommands(true);
-  for(const command of ['openChat','newConversation','explainCode','fixCode','generateTests','indexWorkspace','revertChange']) assert.ok(commands.includes('devpilot.'+command),command);
+  for(const command of ['openChat','newConversation','explainCode','fixCode','generateTests','indexWorkspace','revertChange','showAuditLog','clearAuditLog']) assert.ok(commands.includes('devpilot.'+command),command);
   await vscode.commands.executeCommand('devpilot.openChat');
   const folder=vscode.workspace.workspaceFolders?.[0]; assert.ok(folder);
   let approve=true;

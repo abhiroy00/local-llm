@@ -15,6 +15,14 @@ describe('local inference boundary', () => {
     expect(await new OllamaService('http://localhost:11434',fetcher).models()).toEqual(['local:test']);
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
+  it('reports an Ollama-specific message when model discovery times out', async () => {
+    const timeout=vi.spyOn(AbortSignal,'timeout').mockReturnValue(AbortSignal.abort(new DOMException('The operation was aborted due to timeout.','TimeoutError')));
+    const fetcher=vi.fn<typeof fetch>().mockImplementation(async(_url,init)=>{init?.signal?.throwIfAborted();return new Response();});
+    try {
+      await expect(new OllamaService('http://localhost:11434',fetcher).models()).rejects.toThrow('Ollama model discovery timed out after 30 seconds.');
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    } finally { timeout.mockRestore(); }
+  });
   it('decodes fragmented UTF-8, multiple frames and final frame without newline', async () => {
     const data = new TextEncoder().encode(JSON.stringify({message:{content:'नमस्ते'}})+'\n'+JSON.stringify({message:{content:' world'},done:true,prompt_eval_count:4,eval_count:2}));
     const stream = new ReadableStream<Uint8Array>({start(controller) { for (const byte of data) controller.enqueue(new Uint8Array([byte])); controller.close(); }});

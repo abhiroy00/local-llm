@@ -51,6 +51,14 @@
       {
         "command": "devpilot.revertChange",
         "title": "DevPilot AI: Revert Last Change"
+      },
+      {
+        "command": "devpilot.showAuditLog",
+        "title": "DevPilot AI: Show Audit Log"
+      },
+      {
+        "command": "devpilot.clearAuditLog",
+        "title": "DevPilot AI: Clear Audit Log"
       }
     ],
     "viewsContainers": {

@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { workspace, window, commands } from './vscode.mock';
-import { FileEditor, fingerprint } from '../src/tools/FileEditor';
+import { FileEditor, fingerprint, isSensitiveConfiguration } from '../src/tools/FileEditor';
 import { WorkspaceService } from '../src/services/WorkspaceService';
 import { PersistenceService, workspaceKey } from '../src/services/PersistenceService';
 import { ToolRegistry } from '../src/tools/ToolRegistry';
@@ -14,6 +14,58 @@ let root:string;
 beforeEach(async()=>{ vi.clearAllMocks(); workspace.isTrusted=true; workspace.textDocuments=[]; root=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'devpilot-tools-'))); await fs.writeFile(path.join(root,'a.ts'),'before'); workspace.openTextDocument.mockResolvedValue({isDirty:false,version:1,positionAt:()=>({line:0,character:0}),getText:()=> 'before',save:async()=>true}); window.showWarningMessage.mockResolvedValue(undefined); commands.executeCommand.mockResolvedValue(undefined); });
 afterEach(async()=>{ await fs.rm(root,{recursive:true,force:true}); });
 const signal=()=>new AbortController().signal;
+it('classifies executable configuration paths for elevated approval',()=>{
+  for(const file of ['package.json','packages/app/package-lock.json','.vscode/tasks.json','.github/workflows/ci.yml','scripts/build.ps1']) expect(isSensitiveConfiguration(file)).toBe(true);
+  for(const file of ['src/app.ts','docs/guide.md']) expect(isSensitiveConfiguration(file)).toBe(false);
+});
+it('requires the distinct approval action for sensitive file edits',async()=>{
+  const approve=vi.fn(async()=>false);
+  const editor=new FileEditor(new WorkspaceService(root),approve);
+  try {
+    expect(await editor.change('package.json','{"scripts":{}}',undefined,signal())).toMatchObject({applied:false});
+    expect(approve).toHaveBeenCalledWith(expect.stringContaining('executable configuration'),'Apply sensitive change',expect.any(AbortSignal));
+    await expect(fs.stat(path.join(root,'package.json'))).rejects.toThrow();
+  } finally {editor.dispose();}
+});
+it('redacts file results and blocks agent edits to files containing credentials',async()=>{
+  const secret='fixture-secret-value';
+  await fs.writeFile(path.join(root,'config.ts'),`export const password = "${secret}";`);
+  const tools=new ToolRegistry(new WorkspaceService(root),()=>{});
+  try {
+    const result=await tools.execute('read_file',{path:'config.ts'},'agent',signal()) as {content:string;hash:string};
+    expect(result.content).not.toContain(secret);
+    expect(result.content).toContain('[REDACTED:password]');
+    await expect(tools.execute('edit_file',{path:'config.ts',content:'export const password = process.env.PASSWORD;',hash:result.hash},'agent',signal())).rejects.toThrow('blocked for files containing detected credentials');
+    await expect(tools.execute('create_file',{path:'leak.ts',content:`const token = "${secret}";`},'agent',signal())).rejects.toThrow('contains a detected credential');
+  } finally {tools.dispose();}
+});
+it('persists bounded, task-correlated audit summaries without file contents',async()=>{
+  const storage=await fs.mkdtemp(path.join(os.tmpdir(),'devpilot-audit-'));
+  const persistence=await PersistenceService.open(storage);
+  const tools=new ToolRegistry(new WorkspaceService(root),()=>{},async()=>false,persistence);
+  try {
+    await tools.execute('read_file',{path:'a.ts'},'plan',signal(),'task-fixture');
+    await tools.execute('edit_file',{path:'a.ts',content:'after',hash:fingerprint('before')},'agent',signal(),'task-fixture');
+    const events=await persistence.listAuditEvents();
+    expect(events.map(event=>event.outcome)).toEqual(['started','succeeded','started','rejected']);
+    expect(events.every(event=>event.taskId==='task-fixture')).toBe(true);
+    expect(events.some(event=>event.approval==='rejected')).toBe(true);
+    expect(JSON.stringify(events)).not.toContain('before');
+  } finally {tools.dispose();await fs.rm(storage,{recursive:true,force:true});}
+});
+it('records approved changes in the persisted audit trail',async()=>{
+  const storage=await fs.mkdtemp(path.join(os.tmpdir(),'devpilot-audit-'));
+  const persistence=await PersistenceService.open(storage);
+  const tools=new ToolRegistry(new WorkspaceService(root),()=>{},async()=>true,persistence);
+  try {
+    workspace.applyEdit.mockImplementationOnce(async()=>{await fs.writeFile(path.join(root,'a.ts'),'after');return true;});
+    await tools.execute('edit_file',{path:'a.ts',content:'after',hash:fingerprint('before')},'agent',signal(),'approved-task');
+    expect(await persistence.listAuditEvents()).toMatchObject([
+      {outcome:'started',approval:'pending'},
+      {outcome:'succeeded',approval:'approved'},
+    ]);
+  } finally {tools.dispose();await fs.rm(storage,{recursive:true,force:true});}
+});
 it('requires approval and never applies rejected edits',async()=>{
   const editor=new FileEditor(new WorkspaceService(root));
   try { expect(await editor.change('a.ts','after',fingerprint('before'),signal())).toMatchObject({applied:false}); expect(workspace.applyEdit).not.toHaveBeenCalled(); expect(await fs.readFile(path.join(root,'a.ts'),'utf8')).toBe('before'); expect(commands.executeCommand).toHaveBeenCalledWith('vscode.diff',expect.anything(),expect.anything(),expect.anything(),expect.anything()); }

@@ -4,9 +4,17 @@ import { createTwoFilesPatch, applyPatch, parsePatch } from 'diff';
 import { promises as fs } from 'node:fs';
 import { WorkspaceService } from '../services/WorkspaceService';
 import { PersistenceService, type UndoRecord } from '../services/PersistenceService';
+import { containsSecrets } from '../security/SecretRedactor';
 import type { ApprovalFunction } from '../security/ApprovalService';
 
 export const fingerprint = (text: string): string => createHash('sha256').update(text).digest('hex');
+export function isSensitiveConfiguration(file:string):boolean {
+  const path=file.replace(/\\/g,'/').toLowerCase();
+  return /(^|\/)(package(?:-lock)?\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|yarn\.lock|makefile|dockerfile|justfile|pyproject\.toml|cargo\.toml|composer\.json|gemfile|rakefile|vite\.config\.[^/]+|webpack\.config\.[^/]+|rollup\.config\.[^/]+|esbuild\.[^/]+|[^/]+\.(?:sh|ps1|bat|cmd|bash|zsh))$/.test(path)
+    || /(^|\/)\.vscode\/(tasks|launch|settings)\.json$/.test(path)
+    || /(^|\/)\.github\/workflows\/[^/]+$/.test(path)
+    || /(^|\/)(scripts|\.husky)\//.test(path);
+}
 export class FileEditor implements vscode.Disposable {
   private previews = new Map<string,string>();
   private backups: UndoRecord[] = [];
@@ -18,8 +26,9 @@ export class FileEditor implements vscode.Disposable {
     if(this.persistence) this.backups=await this.persistence.loadUndoRecords(this.workspaceId);
     this.backupsLoaded=true;
   }
-  private async saveBackups():Promise<void> {
-    if(this.persistence) await this.persistence.saveUndoRecords(this.workspaceId,this.backups);
+  private async saveBackups():Promise<number> {
+    if(this.persistence) return this.persistence.saveUndoRecords(this.workspaceId,this.backups);
+    return 0;
   }
   async change(file: string, content: string | undefined, expectedHash: string | undefined, signal: AbortSignal,recordBackup=true): Promise<unknown> {
     if (!vscode.workspace.isTrusted) throw new Error('Workspace trust required.');
@@ -38,11 +47,14 @@ export class FileEditor implements vscode.Disposable {
     if (document?.isDirty) throw new Error('Save your unsaved changes before approving an agent edit.');
     const version = document?.version;
     const left = vscode.Uri.parse(`devpilot-preview:/${randomUUID()}/before/${file}`); const right = vscode.Uri.parse(`devpilot-preview:/${randomUUID()}/after/${file}`);
+    let undoWarning:string|undefined;
     this.previews.set(left.toString(),before ?? ''); this.previews.set(right.toString(),content ?? '');
     try {
       await vscode.commands.executeCommand('vscode.diff',left,right,`DevPilot: ${file} (${content === undefined ? 'delete' : before === undefined ? 'create' : 'edit'})`,{preview:true});
-      const title=`DevPilot proposes ${content === undefined ? 'deleting' : before === undefined ? 'creating' : 'editing'} ${file}. Review the open diff before applying.`;
-      const approved=this.approve ? await this.approve(title,'Apply change',signal) : (await vscode.window.showWarningMessage(title,{modal:false},'Apply change'))==='Apply change';
+      const sensitive=isSensitiveConfiguration(file);
+      const title=`DevPilot proposes ${content === undefined ? 'deleting' : before === undefined ? 'creating' : 'editing'} ${file}.${sensitive ? ' WARNING: this executable configuration can change project scripts or automation; review carefully.' : ''} Review the open diff before applying.`;
+      const action=sensitive ? 'Apply sensitive change' : 'Apply change';
+      const approved=this.approve ? await this.approve(title,action,signal) : (await vscode.window.showWarningMessage(title,{modal:false},action))===action;
       signal.throwIfAborted();
       if (!approved) return {applied:false,reason:'User rejected the change.'};
       if(await this.workspace.resolve(file,true)!==target) throw new Error('Workspace path changed while reviewing.');
@@ -59,10 +71,13 @@ export class FileEditor implements vscode.Disposable {
       const after=content === undefined ? undefined : await this.workspace.read(file);
       if(recordBackup) {
         this.backups.push({path:file,before,after}); this.backups = this.backups.slice(-20);
-        try { await this.saveBackups(); }
+        try {
+          await this.saveBackups();
+          if(this.persistence && (containsSecrets(before ?? '') || containsSecrets(after ?? ''))) undoWarning='Undo for this change was not persisted because its file contains a detected credential.';
+        }
         catch(error) { throw new Error(`Change applied to ${file}, but its undo record could not be saved: ${error instanceof Error ? error.message : 'Storage failed.'}`); }
       }
-      return {applied:true,file,hash:after === undefined ? undefined : fingerprint(after),diff:createTwoFilesPatch(file,file,before ?? '',after ?? '').slice(0,8000)};
+      return {applied:true,file,hash:after === undefined ? undefined : fingerprint(after),diff:createTwoFilesPatch(file,file,before ?? '',after ?? '').slice(0,8000),warning:undoWarning};
     } finally { this.previews.delete(left.toString()); this.previews.delete(right.toString()); }
   }
   async patch(file: string, patch: string, expectedHash: string, signal: AbortSignal): Promise<unknown> {

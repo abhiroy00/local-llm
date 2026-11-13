@@ -25,8 +25,8 @@ it('uses the real HTTP transport against a local Ollama protocol test server', a
     const service = new OllamaService(`http://127.0.0.1:${address.port}`);
     expect(await service.models()).toEqual(['protocol-test']);
     let output = '';
-    const usage = await service.chat('protocol-test',[{role:'user',content:'test prompt'}],4096,new AbortController().signal,chunk => { output += chunk; });
+    const usage = await service.chat('protocol-test',[{role:'user',content:'test prompt password="fixture-secret-value"'}],4096,new AbortController().signal,chunk => { output += chunk; });
     expect(output).toBe('hello world'); expect(usage.completion).toBe(2);
-    expect(JSON.parse(body).messages).toEqual([{role:'user',content:'test prompt'}]);
+    expect(JSON.parse(body).messages).toEqual([{role:'user',content:'test prompt password="[REDACTED:password]"'}]);
   } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
 });

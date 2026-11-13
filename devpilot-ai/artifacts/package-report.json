@@ -1,8 +1,8 @@
 {
   "version": "0.3.1",
   "packagePath": "artifacts\\devpilot-ai-0.3.1.vsix",
-  "bytes": 331307,
-  "sha256": "44e375b870f88aeadf3fd2f63bad576e132f382cd37d14d087f0cd82e3799f6f",
+  "bytes": 345355,
+  "sha256": "aae3350cda058c48deb7b9feb704e9924356480a8020a2bec13ecbf7ad4c0937",
   "files": [
     ".gitignore",
     "ARCHITECTURE.md",
@@ -15,6 +15,7 @@
     "ROADMAP.md",
     "SECURITY.md",
     "VALIDATION.md",
+    "docs/DEVPILOT_AUDIT.md",
     "dist/extension.js",
     "dist/webview.css",
     "dist/webview.js",
