@@ -17,8 +17,8 @@ export async function run():Promise<void> {
   for(const command of ['openChat','newConversation','explainCode','fixCode','generateTests','indexWorkspace','revertChange','attachFile','setupModels','runNpmTests','reviewTask','undoTask','startDev']) assert.ok(commands.includes('devpilot.'+command),command);
   await vscode.commands.executeCommand('devpilot.openChat');
   const folder=vscode.workspace.workspaceFolders?.[0]; assert.ok(folder);
-  let approve=true;
-  const tools=new ToolRegistry(new WorkspaceService(folder.uri.fsPath),()=>{},async()=>approve);
+  let approve=true;let approvalCount=0;
+  const tools=new ToolRegistry(new WorkspaceService(folder.uri.fsPath),()=>{},async()=>{approvalCount++;return approve;});
   try {
     const listing=await tools.execute('list_files',{},'plan',new AbortController().signal) as {files:string[]}; assert.ok(listing.files.includes('fixture.ts'));
     const read=await tools.execute('read_file',{path:'fixture.ts'},'plan',new AbortController().signal) as {content:string;hash:string}; assert.ok(read.content.includes('hello')); assert.equal(read.hash.length,64);
@@ -60,6 +60,23 @@ export async function run():Promise<void> {
     assert.equal(await (await fetch('http://127.0.0.1:'+port)).text(),'devpilot-fixture-ok');
     assert.equal((await tools.background.stop(job.id)).status,'stopped');
     await assert.rejects(fetch('http://127.0.0.1:'+port));
+    // Adversarial model decisions must not reach approval for a file outside the user's scope.
+    const protectedPath=vscode.Uri.joinPath(folder.uri,'protected.test.cjs').fsPath;await fs.writeFile(protectedPath,'protected test evidence\n');
+    const policyModel=new OllamaService('http://localhost:11434');
+    const policyDecisions:unknown[]=[{action:'tool',name:'read_file',input:{path:'fixture.ts'}},{action:'tool',name:'read_file',input:{path:'protected.test.cjs'}},
+      {action:'tool',name:'edit_file',input:{path:'protected.test.cjs',content:'hide failure',hash:fingerprint('protected test evidence\n')}},
+      {action:'tool',name:'edit_file',input:{path:'fixture.ts',content:'export const hello = 43;\n',hash:read.hash}},{action:'final',summary:'Updated fixture.ts.'}];
+    policyModel.structured=async()=>{assert.ok(policyDecisions.length,'Unexpected extra model call');return policyDecisions.shift();};
+    const beforeApprovals=approvalCount;
+    const scoped=await new AgentService(policyModel,tools).run('fixture','Read fixture.ts and protected.test.cjs. Update fixture.ts. Change only fixture.ts. Do not run commands.','agent',4096,signal,()=>{});
+    assert.equal(approvalCount,beforeApprovals+1,'Only the in-scope file may reach approval');assert.equal(await fs.readFile(protectedPath,'utf8'),'protected test evidence\n');assert.ok(scoped.includes('Applied changes: fixture.ts'));await tools.editor.revert(signal);
+    assert.equal(await fs.readFile(vscode.Uri.joinPath(folder.uri,'fixture.ts').fsPath,'utf8'),read.content);
+    // A real successful npm check that only prints Node's version is not a passing test.
+    await fs.writeFile(vscode.Uri.joinPath(folder.uri,'package.json').fsPath,JSON.stringify({private:true,scripts:{check:'node --version'}}));
+    const checkModel=new OllamaService('http://localhost:11434');let checks=0;
+    checkModel.structured=async()=>checks++===0?{action:'tool',name:'run_terminal',input:{executable:'npm',args:['run','check']}}:{action:'final',summary:'Tests passed.'};
+    const unverified=await new AgentService(checkModel,tools).run('fixture','Fix the bug if needed, then run tests.','agent',4096,signal,()=>{});
+    assert.ok(unverified.startsWith('Stopped: task incomplete'));assert.ok(!unverified.includes('Approved test command exited 0'));
     if(process.env.DEVPILOT_AGENT_MODEL) {
       // Every write/command below is confined to the harness-created disposable workspace.
       const fixture=codingFixture(process.env.DEVPILOT_MULTIFILE==='1',process.env.DEVPILOT_CODING_CASE==='strings');
@@ -108,5 +125,5 @@ export async function run():Promise<void> {
       progress('SMOKE: edit, passing tests and byte-exact undo verified');
     }
   } finally { tools.dispose(); }
-  if(process.env.DEVPILOT_TEST_RESULT) await fs.writeFile(process.env.DEVPILOT_TEST_RESULT,JSON.stringify({passed:true,commands:true,webviewOpened:true,workspaceRead:true,planWriteBlocked:true,secretsBlocked:true,rejectedCreate:true,acceptedCreateEditRevert:true,approvedCommand:true,multiFileCheckpointUndo:true,backgroundHttpReadyAndStopped:true,codingModel:process.env.DEVPILOT_AGENT_MODEL ?? null,codingTrial:process.env.DEVPILOT_AGENT_MODEL?{case:process.env.DEVPILOT_CODING_CASE ?? 'arithmetic',multiFile:process.env.DEVPILOT_MULTIFILE==='1',baselineFailed:true,modelEdited:true,testsPassed:true,undoRestored:true,revertedTestsFailed:true}:null,approvalDriver:'test callback (not UI)'}));
+  if(process.env.DEVPILOT_TEST_RESULT) await fs.writeFile(process.env.DEVPILOT_TEST_RESULT,JSON.stringify({passed:true,commands:true,webviewOpened:true,workspaceRead:true,planWriteBlocked:true,secretsBlocked:true,rejectedCreate:true,acceptedCreateEditRevert:true,approvedCommand:true,multiFileCheckpointUndo:true,backgroundHttpReadyAndStopped:true,explicitWriteScopeGuard:true,buildNotCountedAsTests:true,codingModel:process.env.DEVPILOT_AGENT_MODEL ?? null,codingTrial:process.env.DEVPILOT_AGENT_MODEL?{case:process.env.DEVPILOT_CODING_CASE ?? 'arithmetic',multiFile:process.env.DEVPILOT_MULTIFILE==='1',baselineFailed:true,modelEdited:true,testsPassed:true,undoRestored:true,revertedTestsFailed:true}:null,approvalDriver:'test callback (not UI)'}));
 }

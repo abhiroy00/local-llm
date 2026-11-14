@@ -314,3 +314,21 @@ it('refreshes current sources for one bounded repair pass after staged tests sti
   expect(result).toContain('Approved test command exited 0');expect(execute).toHaveBeenNthCalledWith(7,'read_file',{path:'alpha.py'},'agent',expect.any(AbortSignal));
   expect(JSON.stringify(call.mock.calls[6][1])).toContain('alpha first');expect(JSON.stringify(call.mock.calls[6][1])).toContain('alpha still fails');expect(execute).toHaveBeenCalledTimes(10);
 });
+
+it('blocks out-of-scope test edits before approval and continues with the allowed source file',async()=>{
+  const ollama=new OllamaService('http://localhost:11434');const progress=vi.fn();
+  vi.spyOn(ollama,'structured').mockResolvedValueOnce({action:'tool',name:'read_file',input:{path:'a.ts'}}).mockResolvedValueOnce({action:'tool',name:'read_file',input:{path:'a.test.ts'}})
+    .mockResolvedValueOnce({action:'tool',name:'edit_file',input:{path:'a.test.ts',content:'hide failure',hash:'a'.repeat(64)}})
+    .mockResolvedValueOnce({action:'tool',name:'edit_file',input:{path:'a.ts',content:'fix',hash:'a'.repeat(64)}})
+    .mockResolvedValueOnce({action:'tool',name:'run_tests',input:{runner:'npm'}}).mockResolvedValueOnce({action:'final',summary:'Fixed a.ts; tests passed.'});
+  const execute=vi.fn().mockResolvedValueOnce({content:'source',hash:'a'.repeat(64)}).mockResolvedValueOnce({content:'tests',hash:'b'.repeat(64)}).mockResolvedValueOnce({applied:true,file:'a.ts'}).mockResolvedValueOnce({exitCode:0});
+  const result=await new AgentService(ollama,{catalog:toolCatalog,execute}).run('fixture','Read a.ts and a.test.ts. Fix the bug. Change only a.ts, then run npm test.','agent',4096,signal(),progress);
+  expect(execute.mock.calls.filter(call=>call[0]==='edit_file').map(call=>call[1].path)).toEqual(['a.ts']);expect(result).toContain('Approved test command exited 0');expect(progress.mock.calls.some(call=>call[0].includes('File change blocked'))).toBe(true);
+});
+it('does not accept a successful build/check as passing tests after a source edit',async()=>{
+  const ollama=new OllamaService('http://localhost:11434');
+  vi.spyOn(ollama,'structured').mockResolvedValueOnce({action:'tool',name:'edit_file',input:{path:'a.ts'}}).mockResolvedValueOnce({action:'tool',name:'run_terminal',input:{executable:'npm',args:['run','check']}}).mockResolvedValue({action:'final',summary:'All tests passed.'});
+  const execute=vi.fn().mockResolvedValueOnce({applied:true,file:'a.ts'}).mockResolvedValueOnce({exitCode:0,output:'Type check only'});
+  const result=await new AgentService(ollama,{catalog:toolCatalog,execute}).run('fixture','Fix a.ts and run tests.','agent',4096,signal(),()=>{});
+  expect(result).toContain('Stopped: task incomplete');expect(result).not.toContain('All tests passed');expect(result).toContain('No passing test command recorded since the latest file change');
+});

@@ -1,3 +1,13 @@
+# Validation — 0.6.2 (2026-11-14)
+
+- Local checks: 119 unit/DOM tests passed; the native CI hook is skipped in ordinary local runs and runs automatically on GitHub Windows. TypeScript, ESLint and production build passed.
+- Native Mac acceptance added adversarial model decisions against real workspace tools. A valid-hash proposal to change a protected test file was blocked before approval; the permitted source edit alone reached approval and undo restored it. A real `npm run check` that only prints Node's version was not accepted as test evidence.
+- The low-memory Qwen 3B two-file arithmetic coding trial passed with the new guards: both source edits, passing npm tests, independent rerun, exact grouped undo and failing tests restored. Tests and package script were unchanged.
+- Scope recognition targets inline literal file lists, not arbitrary prose or an OS sandbox. Approved commands can still modify project files as their scripts specify. Known test-discovery flags are excluded; successful named scripts do not establish test coverage or test counts by themselves.
+- Current Windows/Linux verification is tracked in the [test-branch CI runs](https://github.com/abhiroy00/local-llm/actions?query=branch%3Adevpilot%2Fverify-0.6.1). The 0.6.1 results below remain historical evidence. Native desktop clicks and the broader string-task model failure remain unresolved.
+
+---
+
 # Validation — 0.6.1 (2026-11-14)
 
 ## Passed

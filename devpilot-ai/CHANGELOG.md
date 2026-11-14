@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.2 — 2026-11-14
+
+- Enforce explicit inline file-change scopes before approval, including test files read only as context. Respect literal exclusions and reject unsupported path patterns.
+- Restrict staged repair targets to the allowed edit scope.
+- Count test evidence from recognized command shapes; exclude build/lint/check commands and known discovery/compile-only flags.
+- Add policy regressions and native adversarial decision tests: an out-of-scope test-file edit never reaches approval, and a real successful version-only npm check is not counted as passing tests.
+
+
 ## 0.6.1 — 2026-11-14
 
 - Stage small explicit multi-file repairs into one-file model proposals with host-held paths/current hashes, complete applicable root/nested guidance and normal diff approvals.

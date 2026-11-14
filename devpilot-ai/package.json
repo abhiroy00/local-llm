@@ -2,7 +2,7 @@
   "name": "devpilot-ai",
   "displayName": "DevPilot AI",
   "description": "Local-first coding agent with approved workspace tools and Ollama chat.",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "publisher": "devpilot",
   "engines": {
     "vscode": "^1.106.0"

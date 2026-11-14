@@ -2,7 +2,7 @@
 
 **Your Code. Your Machine. Your AI.**
 
-DevPilot AI 0.6.1 is a local coding agent for VS Code with Ollama, approved edits and commands, and a compact chat sidebar. It appears in the **right-hand Secondary Side Bar**, alongside views such as Chat and Codex. Requires VS Code 1.106+.
+DevPilot AI 0.6.2 is a local coding agent for VS Code with Ollama, approved edits and commands, and a compact chat sidebar. It appears in the **right-hand Secondary Side Bar**, alongside views such as Chat and Codex. Requires VS Code 1.106+.
 
 ## DeepSeek and Windows
 
@@ -36,6 +36,12 @@ Open the repository root or this folder in VS Code. Select **Run DevPilot AI** a
 Expand **Workspace changes & processes** in the sidebar. Each coding task groups its approved file edits into a persistent checkpoint. Click a path to review the aggregate diff; **Undo task with review** reverts the latest task in reverse order, with approval for every file edit. All affected final file states are checked before undo begins. Manual changes block undo; rejection stops it and retains the remaining records. This is a sequence of approved changes, not an atomic transaction. Retention is at most 20 edits; complete older task groups are evicted together. Commands and their side effects are not checkpointed.
 
 **Run npm dev** / **Run npm start** preview the actual package script and hooks before approval. One background process can run per workspace, with bounded output, a ten-minute lifetime and an explicit Stop action. The agent also has start/read/stop process tools for server tasks. Running status does not prove HTTP readiness. Processes are stopped on workspace disposal/reload; they are not resumed after restarting VS Code. Command palette actions include **Review Last Task Changes**, **Undo Last Task Changes** and **Start Development Process**.
+
+## Task boundaries and verification
+
+Inline requests such as **Change only `src/add.ts` and `src/helpers.ts`.** limit FileEditor create/edit/replace/patch/delete calls to those literal paths, before diff approval. The agent can still read test files and other evidence. Explicit exclusions are respected; unsupported path/glob forms are blocked rather than treated as unrestricted writes. General prose restrictions are not a full natural-language policy engine. Approved project commands can have side effects outside this file-tool boundary; they are not OS-sandboxed.
+
+Build/lint/check success no longer satisfies test verification after code changes. Test evidence requires a recognized test invocation, and known help/list/collect-only/no-run flags are excluded. A successful test script still needs its output inspected for coverage and test counts.
 
 ## Small multi-file repairs
 
