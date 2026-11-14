@@ -8,6 +8,7 @@ const executed: string[] = [];
 const agent = new AgentService(new OllamaService('http://localhost:11434'), {
   catalog:toolCatalog,
   execute:async (name,input,_mode,signal) => {
+    console.log('DECISION',name,JSON.stringify(input).slice(0,200));
     const parsed=schemas[name].parse(input) as Record<string,string>;
     executed.push(name); console.log('TOOL',name);
     if(name==='list_files') return workspace.files(signal);
@@ -19,8 +20,11 @@ const agent = new AgentService(new OllamaService('http://localhost:11434'), {
   }
 });
 (async()=>{
- const result=await agent.run('qwen2.5-coder:3b','Read fixture.ts using read_file, then explain what hello exports. Do not guess; inspect the file.','plan',4096,AbortSignal.timeout(180000),console.log);
+ const inspection=process.argv.includes('--inspection');
+ const task=inspection ? 'Inspect this project and explain its architecture. Do not modify files or run commands.' : 'Read fixture.ts using read_file, then explain what hello exports. Do not guess; inspect the file.';
+ const result=await agent.run(process.env.DEVPILOT_AGENT_MODEL ?? 'qwen2.5-coder:3b',task,'plan',4096,AbortSignal.timeout(180000),console.log);
  console.log('RESULT',result);
  if(!executed.includes('read_file')) throw new Error('Model did not inspect the file');
- if(!result.includes('42')) throw new Error('Model answer did not reflect fixture');
+ if(inspection && (!result.includes('fixture.ts') || !/README.md|package.json/.test(result) || /Unable to produce a verified|Stopped after/.test(result))) throw new Error('Model did not complete an evidence-backed project inspection');
+ if(!inspection && !result.includes('42')) throw new Error('Model answer did not reflect fixture');
 })().catch(error=>{console.error(error);process.exitCode=1;});

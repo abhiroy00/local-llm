@@ -6,6 +6,7 @@ tests/**
 *.mjs
 tsconfig.json
 tsconfig.host.json
+tsconfig.sidebar-tests.json
 package-lock.json
 scripts/**
 artifacts/**
@@ -13,3 +14,7 @@ vitest.config.*
 dist/*smoke*
 dist/*tests*
 dist/**/*.map
+
+dist/model-setup.cjs
+
+.vscode-test/**

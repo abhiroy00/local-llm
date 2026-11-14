@@ -4,7 +4,7 @@ export const workspace = {
   textDocuments:[] as {uri:{toString():string};isDirty:boolean}[],
   registerTextDocumentContentProvider:vi.fn(()=>({dispose:vi.fn()})),
   openTextDocument:vi.fn(),
-  applyEdit:vi.fn(async()=>true),
+  applyEdit:vi.fn(async(edit?:unknown)=>{void edit;return true;}),
 };
 export const window = {showWarningMessage:vi.fn(),showInformationMessage:vi.fn()};
 export const commands = {executeCommand:vi.fn(async()=>undefined)};
@@ -18,3 +18,5 @@ export class WorkspaceEdit {
   createFile(...args:unknown[]):void { this.changes.push(['create',...args]); }
   insert(...args:unknown[]):void { this.changes.push(['insert',...args]); }
 }
+
+export const languages={getDiagnostics:vi.fn(()=>[])};

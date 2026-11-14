@@ -5,15 +5,14 @@ import * as vscode from 'vscode';
 import { WorkspaceService } from '../services/WorkspaceService';
 import type { ApprovalFunction } from '../security/ApprovalService';
 
+import {processSpec} from './ProcessSpec';
 import { validateCommand } from '../security/Commands';
 export async function runProcess(executable: string,args: string[],cwd: string,signal: AbortSignal): Promise<{exitCode:number|null;output:string;truncated:boolean}> {
   validateCommand(executable,args); signal.throwIfAborted();
   return new Promise((resolve,reject) => {
     const windows = process.platform === 'win32';
-    const actualArgs = executable === 'git' ? ['-c','core.fsmonitor=false','-c','status.relativePaths=true','--no-pager',...(args[0] === 'diff' ? ['diff','--relative','--no-ext-diff','--no-textconv'] : ['status','--short','--untracked-files=all','--','.'])] : args;
-    const child = windows && executable === 'npm'
-      ? spawn(process.env.ComSpec ?? 'C:\\Windows\\System32\\cmd.exe',['/d','/s','/c',`npm ${args.join(' ')}`],{cwd,windowsHide:true,stdio:['ignore','pipe','pipe']})
-      : spawn(executable,actualArgs,{cwd,windowsHide:true,stdio:['ignore','pipe','pipe'],detached:!windows});
+    const spec=processSpec(executable,args);
+    const child=spawn(spec.executable,spec.args,{cwd,windowsHide:true,stdio:['ignore','pipe','pipe'],detached:spec.detached});
     let output = ''; let truncated = false; let stopped = false;
     const capture = (chunk: Buffer) => { const text = chunk.toString(); if (output.length + text.length > 20000) truncated = true; output = (output + text).slice(0,20000); };
     const stop = () => { stopped = true; if (child.pid) { if (windows) spawn('taskkill',['/PID',String(child.pid),'/T','/F'],{windowsHide:true,stdio:'ignore'}).on('error',() => child.kill()).on('exit',code => { if (code !== 0) child.kill(); }); else { try { process.kill(-child.pid,'SIGKILL'); } catch { child.kill('SIGKILL'); } } } };
@@ -21,11 +20,11 @@ export async function runProcess(executable: string,args: string[],cwd: string,s
     if (signal.aborted) stop();
     child.stdout.on('data',capture); child.stderr.on('data',capture);
     const cleanup = () => { clearTimeout(timeout); signal.removeEventListener('abort',stop); };
-    child.on('error',error => { cleanup(); reject(error); });
+    child.on('error',error => { cleanup(); reject((error as NodeJS.ErrnoException).code==='ENOENT' ? new Error(`Cannot find ${executable}. Install the toolchain and restart VS Code so its PATH is refreshed.`) : error); });
     child.on('close',code => { cleanup(); if (stopped) reject(new Error('Command cancelled or timed out after 60 seconds.')); else resolve({exitCode:code,output,truncated}); });
   });
 }
-export async function approvedTerminal(root: string,executable:string,args:string[],signal:AbortSignal,approve?:ApprovalFunction,allowedWorkspace?:WorkspaceService): Promise<unknown> {
+export async function approveCommand(root: string,executable:string,args:string[],signal:AbortSignal,approve?:ApprovalFunction): Promise<boolean> {
   validateCommand(executable,args); signal.throwIfAborted();
   if (!vscode.workspace.isTrusted) throw new Error('Workspace trust required.');
   const realRoot = await fs.realpath(root);
@@ -36,9 +35,13 @@ export async function approvedTerminal(root: string,executable:string,args:strin
   if (executable === 'npm') { approvedManifest=await readManifest(); const pkg = JSON.parse(approvedManifest); const name=args[0] === 'test' ? 'test' : args[1]; const selected=Object.fromEntries(['pre'+name,name,'post'+name].map(key=>[key,pkg.scripts?.[key] ?? '(not defined)'])); const preview=JSON.stringify(selected,null,2); if(preview.length>6000) throw new Error('Script preview too long. Inspect/run the command manually.'); scripts = '\nSelected scripts and lifecycle hooks:\n'+preview; }
   const title=`Run ${executable} ${args.join(' ')}?\nDirectory: ${root}\nProject scripts and tests execute project code and may modify files or access the network.${scripts}`;
   const approved=approve ? await approve(title,'Run command',signal) : (await vscode.window.showWarningMessage(title,{modal:true},'Run command'))==='Run command';
-  signal.throwIfAborted(); if (!approved) return {approved:false};
+  signal.throwIfAborted(); if (!approved) return false;
   if (!vscode.workspace.isTrusted || await fs.realpath(root) !== realRoot) throw new Error('Workspace changed or is untrusted.');
   if(approvedManifest!==undefined && await readManifest()!==approvedManifest) throw new Error('package.json changed during approval. Review the command again.');
+  return true;
+}
+export async function approvedTerminal(root:string,executable:string,args:string[],signal:AbortSignal,approve?:ApprovalFunction,allowedWorkspace?:WorkspaceService):Promise<unknown> {
+  if(!await approveCommand(root,executable,args,signal,approve)) return {approved:false};
   const result = await runProcess(executable,args,root,signal);
   if(executable === 'git' && result.exitCode === 0) {
     const workspace = allowedWorkspace ?? new WorkspaceService(root,vscode.workspace.getConfiguration('devpilot').get<string[]>('ignorePatterns',[]));

@@ -1,12 +1,20 @@
+import {runtimeBuild} from './types/runtime';
 import * as vscode from 'vscode';
 import { ChatViewProvider } from './providers/ChatViewProvider';
 import { PersistenceService } from './services/PersistenceService';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const persistence = await PersistenceService.open(context.globalStorageUri.fsPath);
-  const provider = new ChatViewProvider(context.extensionUri,persistence);
+  const provider = new ChatViewProvider(context.extensionUri,persistence,context.globalState,{...runtimeBuild,mode:context.extensionMode===vscode.ExtensionMode.Development?'development':context.extensionMode===vscode.ExtensionMode.Test?'test':'installed'});
   context.subscriptions.push(
     provider,
+    vscode.commands.registerCommand('devpilot.reviewTask',()=>provider.reviewLatestTask()),
+    vscode.commands.registerCommand('devpilot.undoTask',async()=>{await vscode.commands.executeCommand('devpilot.chat.focus');await provider.undoLatestTask();}),
+    vscode.commands.registerCommand('devpilot.startDev',async()=>{await vscode.commands.executeCommand('devpilot.chat.focus');await provider.startProcess('dev');}),
+    vscode.commands.registerCommand('devpilot.runNpmTests',async()=>{await vscode.commands.executeCommand('devpilot.chat.focus');await provider.runNpmTests();}),
+    vscode.commands.registerCommand('devpilot.showRuntime',()=>vscode.window.showInformationMessage(`DevPilot ${runtimeBuild.version} · build ${runtimeBuild.build} · ${context.extensionMode===vscode.ExtensionMode.Development?'development host':'installed extension'}`)),
+    vscode.commands.registerCommand('devpilot.setupModels',async()=>{await vscode.commands.executeCommand('devpilot.chat.focus');provider.openModelSetup();}),
+    vscode.commands.registerCommand('devpilot.attachFile',()=>provider.attachFile()),
     vscode.commands.registerCommand('devpilot.indexWorkspace',() => provider.indexWorkspace()),
     vscode.commands.registerCommand('devpilot.reviewProject',async () => { await vscode.commands.executeCommand('devpilot.chat.focus'); await provider.reviewProject(); }),
     vscode.commands.registerCommand('devpilot.explainCode',async () => { await vscode.commands.executeCommand('devpilot.chat.focus'); await provider.editorTask('Explain the selected code.'); }),

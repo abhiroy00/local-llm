@@ -16,6 +16,7 @@ export interface SemanticEntry {
 }
 
 export interface UndoRecord {
+  taskId?:string;taskTitle?:string;createdAt?:number;
   path: string;
   before: string | undefined;
   after: string | undefined;
@@ -56,6 +57,7 @@ function decodeState(raw: string): StoreState {
   }
   for (const records of Object.values(parsed.undo)) {
     if (!Array.isArray(records) || !records.every(item => isObject(item) && typeof item.path === 'string' &&
+      (item.taskId===undefined || (typeof item.taskId==='string' && /^[a-f0-9-]{36}$/i.test(item.taskId))) && (item.taskTitle===undefined || (typeof item.taskTitle==='string' && item.taskTitle.length<=160)) && (item.createdAt===undefined || (typeof item.createdAt==='number' && Number.isFinite(item.createdAt))) &&
       (typeof item.before === 'string' || item.before === undefined) && (typeof item.after === 'string' || item.after === undefined))) {
       throw new Error('Persistent undo data is invalid.');
     }

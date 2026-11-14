@@ -15,6 +15,9 @@
     "check": "npm --prefix devpilot-ai run check",
     "package": "npm --prefix devpilot-ai run package",
     "test:host": "npm --prefix devpilot-ai run test:host",
-    "smoke:agent": "npm --prefix devpilot-ai run smoke:agent"
+    "smoke:agent": "npm --prefix devpilot-ai run smoke:agent",
+    "smoke:inspection": "npm --prefix devpilot-ai run smoke:inspection",
+    "model:setup": "npm --prefix devpilot-ai run model:setup --",
+    "smoke:coding": "npm --prefix devpilot-ai run smoke:coding --"
   }
 }

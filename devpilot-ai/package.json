@@ -2,10 +2,10 @@
   "name": "devpilot-ai",
   "displayName": "DevPilot AI",
   "description": "Local-first coding agent with approved workspace tools and Ollama chat.",
-  "version": "0.3.1",
+  "version": "0.6.1",
   "publisher": "devpilot",
   "engines": {
-    "vscode": "^1.95.0"
+    "vscode": "^1.106.0"
   },
   "categories": [
     "Other"
@@ -51,10 +51,38 @@
       {
         "command": "devpilot.revertChange",
         "title": "DevPilot AI: Revert Last Change"
+      },
+      {
+        "command": "devpilot.attachFile",
+        "title": "DevPilot AI: Attach File"
+      },
+      {
+        "command": "devpilot.setupModels",
+        "title": "DevPilot AI: Set Up DeepSeek Models"
+      },
+      {
+        "command": "devpilot.showRuntime",
+        "title": "DevPilot AI: Show Running Version"
+      },
+      {
+        "command": "devpilot.runNpmTests",
+        "title": "DevPilot AI: Run npm Tests"
+      },
+      {
+        "command": "devpilot.reviewTask",
+        "title": "DevPilot AI: Review Last Task Changes"
+      },
+      {
+        "command": "devpilot.undoTask",
+        "title": "DevPilot AI: Undo Last Task Changes"
+      },
+      {
+        "command": "devpilot.startDev",
+        "title": "DevPilot AI: Start Development Process"
       }
     ],
     "viewsContainers": {
-      "activitybar": [
+      "secondarySidebar": [
         {
           "id": "devpilot",
           "title": "DevPilot AI",
@@ -100,6 +128,29 @@
           "default": "",
           "scope": "machine",
           "description": "Optional installed embedding model for bounded semantic file retrieval. Empty disables embeddings; no model is downloaded."
+        },
+        "devpilot.maxSteps": {
+          "type": "number",
+          "default": 40,
+          "minimum": 4,
+          "maximum": 100,
+          "description": "Maximum tool decisions per coding task. Stop is always available."
+        },
+        "devpilot.defaultModel": {
+          "type": "string",
+          "default": "deepseek-coder:1.3b",
+          "scope": "machine",
+          "description": "Preferred installed local model when the saved selection is unavailable. Setup provides free local DeepSeek quantizations."
+        },
+        "devpilot.inferenceProfile": {
+          "type": "string",
+          "enum": [
+            "low-memory",
+            "balanced"
+          ],
+          "default": "low-memory",
+          "scope": "machine",
+          "description": "Low-memory limits generation to 768 tokens, prompt batches to 64 and CPU threads to 4, with 30-second model retention. Balanced permits longer outputs and higher resource use. Neither profile guarantees sufficient system memory."
         }
       }
     },
@@ -120,19 +171,37 @@
           "group": "devpilot",
           "when": "editorHasSelection"
         }
+      ],
+      "view/title": [
+        {
+          "command": "devpilot.newConversation",
+          "when": "view == devpilot.chat",
+          "group": "navigation",
+          "alt": "devpilot.openSettings"
+        }
       ]
-    }
+    },
+    "keybindings": [
+      {
+        "command": "devpilot.openChat",
+        "key": "ctrl+alt+d",
+        "mac": "cmd+alt+d"
+      }
+    ]
   },
   "scripts": {
     "build": "node build.mjs",
-    "typecheck": "tsc --noEmit && tsc -p webview-ui/tsconfig.json --noEmit && tsc -p tsconfig.host.json --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p webview-ui/tsconfig.json --noEmit && tsc -p tsconfig.host.json --noEmit && tsc -p tsconfig.sidebar-tests.json --noEmit",
     "lint": "eslint src webview-ui/src tests",
     "test": "vitest run",
     "check": "npm run typecheck && npm run lint && npm test && npm run build",
     "vscode:prepublish": "npm run build",
     "package": "node scripts/package.mjs",
     "smoke:agent": "node scripts/run-agent-smoke.mjs",
-    "test:host": "node scripts/run-host-tests.mjs"
+    "test:host": "node scripts/run-host-tests.mjs",
+    "smoke:inspection": "node scripts/run-agent-smoke.mjs --inspection",
+    "model:setup": "node scripts/run-model-setup.mjs",
+    "smoke:coding": "node scripts/run-coding-smoke.mjs"
   },
   "dependencies": {
     "diff": "^9.0.0",
@@ -147,13 +216,16 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
+    "@types/jsdom": "^21.1.7",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/vscode": "^1.95.0",
+    "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^4.1.0",
     "esbuild": "^0.28.2",
     "eslint": "^10.14.0",
+    "jsdom": "^26.1.0",
     "postcss": "^8.0.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.0",
