@@ -39,10 +39,12 @@ npm run test:host
 - npm is launched through Windows cmd.exe using strictly validated tokens; arbitrary shell strings/injection characters are rejected. Other toolchains spawn directly.
 - Cancellation/timeouts terminate Windows process trees using taskkill; POSIX uses process groups.
 - Windows device names, alternate streams, traversal, links, ignored paths and secret filenames are blocked. Existing CRLF edit/hash/undo regressions remain covered.
-- GitHub Actions config includes Windows/Linux/macOS type/lint/test/build/package checks and separate Windows/macOS native editor jobs. Native CI downloads an isolated official VS Code build using Microsoft's `@vscode/test-electron` helper. No models are downloaded or real inference run in CI.
+- The existing GitHub workflow checks Windows/Linux. On GitHub Windows workers, `tests/native-ci.test.ts` also runs actual native VS Code acceptance within `npm run check`, downloading an isolated official editor through Microsoft's `@vscode/test-electron` helper. No models are downloaded or real inference run in CI.
 
-The current development session runs on macOS. Windows-specific process branches are covered by unit tests; configured Windows CI must run on GitHub before a native Windows pass can be claimed. No remote execution is implied by the presence of a workflow file.
+## Verified Windows execution
 
-## Native verification reports
+[CI run 43582200815](https://github.com/abhiroy00/local-llm/actions/runs/43582200815) passed on verification commit `b4ea9ed86715bd1f236728e52b42901e4ff22acc`: 115 tests in 14 files, type/lint/build checks, production audit and VSIX packaging. Native Windows acceptance verified extension/sidebar opening, file reads, Plan/secret blocking, rejected creation, approved create/edit/revert, grouped task undo, commands and actual HTTP server readiness/stop. Its report identifies `platform: win32`, `version: 0.6.1`, `build: 2d552e9919d6`.
 
-`npm run test:host` now writes `artifacts/native/win32-tools.json` on Windows with the exact version/build and assertions that passed (or a failure record). The GitHub native job uploads these JSON files as `native-windows-latest`. A successful macOS report is not a Windows pass. The prepared verification-branch trigger is `devpilot/verify-*`; pushing/running it still requires authorization for this checkout.
+This verifies native editor/file/process behavior, not real Ollama inference or native approval-card clicks on Windows. Approvals use a fixture-only callback; React DOM tests separately exercise rendered button/host-message behavior.
+
+`npm run test:host` writes `artifacts/native/win32-tools.json` on Windows. CI prints that result in job logs and uploads the Windows package/checksum/inventory as `devpilot-windows-latest`. The downloaded package's SHA-256 and embedded version/build were independently checked locally. The verification branch keeps the existing workflow unchanged because the CLI token lacks workflow-file write scope; no broader credential permission was requested.

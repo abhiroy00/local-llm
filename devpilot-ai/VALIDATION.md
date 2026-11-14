@@ -2,7 +2,8 @@
 
 ## Passed
 
-- TypeScript for host, webview, native harness and sidebar tests; ESLint; 114 tests in 13 files; production build.
+- TypeScript for host, webview, native harness and sidebar tests; ESLint; 114 local unit/DOM tests; production build. The native CI hook passes when invoked locally and runs automatically on GitHub Windows workers.
+- [Windows/Linux CI passed](https://github.com/abhiroy00/local-llm/actions/runs/43582200815) on verification commit `b4ea9ed86715bd1f236728e52b42901e4ff22acc`. Windows: 115 tests in 14 files passed, including actual native VS Code acceptance, production audit (0 vulnerabilities), build and VSIX packaging. Linux checks passed too. Native Windows reported build `2d552e9919d6`; the Mac package reports `87935e1b0a3f` (platform checkout/build inputs differ).
 - Four React DOM/jsdom interaction tests exercise the rendered controls through the actual host message parser/approval handler. They cover mismatched approval IDs, Reject/Run buttons, actual failing-exit display, Stop cancellation, Plan blocking, checkpoint review/process-stop messages, and reviewed two-file undo through FileEditor with real disposable files. Rejection preserves the edited bytes; two matching approvals restore both original files.
 - The original two-file arithmetic trial passed on the release candidate: real Qwen 3B low-memory inference edited both source files, four tests passed, an independent rerun passed, and grouped undo restored exact original bytes and failing tests. The test file and package script were unchanged. Fixture approvals remain explicit harness callbacks.
 - Native Mac activation/sidebar registration, allowed reads, blocked Plan/secret access, rejected creation, WorkspaceEdit changes/undo, commands and actual loopback HTTP readiness/stop remain part of every coding trial.
@@ -14,7 +15,7 @@ The harder string-processing task still fails with Qwen 3B: it produced incorrec
 
 Native desktop control was retried and its control kernel reset. It still reports “native pipe startup failed” and cannot enumerate apps/browsers. Rendered DOM tests are not native screen/approval-card click verification. The user was given official Computer Use setup/permission guidance; an app-side reconnection is still needed.
 
-Windows process branches and test code are prepared, but no Windows runtime executed this checkout. The native CI jobs now save platform/build-stamped JSON reports and upload them as artifacts. A `devpilot/verify-*` branch can trigger the Windows/macOS/Linux checks, subject to user authorization to commit/push. No commit, push, workflow dispatch or deployment was performed.
+The user authorized a test-branch commit/push and CI execution. The CLI could not update workflow files with its current OAuth scope, so the verification branch retains the existing workflow and runs native Windows acceptance through the normal npm-check test suite. The native result is printed in CI logs; the Windows VSIX, checksum and inventory were downloaded and independently verified. No merge or deployment occurred. Windows real-model inference and native UI clicks were not tested.
 
 `npm audit` reports 10 moderate advisories in existing development tooling (minimatch and its dependents), not the new DOM dependency chain. No forced upgrades or major-version downgrades were applied.
 

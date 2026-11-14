@@ -7,7 +7,7 @@
 - Exercise real rendered sidebar buttons against the host approval handler: reject, approve, cancellation, Plan restrictions, checkpoint review and two-file undo through FileEditor.
 - Reject raw binary/control characters before diff preview or file mutation.
 - Add typed DOM tests as development-only dependencies, a second coding fixture and bounded decision diagnostics. Preserve failures rather than claiming full parity.
-- Save platform/build-stamped native acceptance reports and upload them from configured CI jobs. Windows native execution still requires an actual runner.
+- Save platform/build-stamped native acceptance reports. User-authorized Windows/Linux CI passed, including 115 Windows tests and real native editor/file/process acceptance via the existing workflow; no workflow-permission expansion, merge or deployment.
 
 
 ## 0.6.0 — 2026-11-14

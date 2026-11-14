@@ -23,3 +23,5 @@ Native host integration passed on Apple Silicon macOS for 0.4.0. This uses a tes
 ## Task/process acceptance (0.6.0)
 
 `npm run smoke:coding -- qwen2.5-coder:3b --multi` selects the optional harder two-file repair fixture on both macOS and Windows. It checks failing baseline, unchanged test/manifest files, passing tests after model edits, independent rerun and grouped byte-exact undo. This acceptance currently fails with the tested small local model; see VALIDATION.md. `npm run test:host` independently exercises multi-file WorkspaceEdit undo and ephemeral HTTP server readiness/stop without inference. Every fixture is disposable; no production project is targeted.
+
+On GitHub Windows workers, `tests/native-ci.test.ts` runs the native editor fixture as part of `npm run check`. Locally, opt in with `DEVPILOT_NATIVE_CI=1` (PowerShell: `$env:DEVPILOT_NATIVE_CI='1'`) and optionally supply `VSCODE_EXECUTABLE`. The existing workflow can be dispatched on the verification branch without changing workflow files.

@@ -22,7 +22,7 @@ Open the root or extension folder in VS Code. Select **Run DevPilot AI** and pre
 
 ## Install a VSIX
 
-Run `npm run package`, then use **Extensions: Install from VSIX** and select `devpilot-ai/artifacts/devpilot-ai-0.5.6.vsix` when packaging from the root. Reload VS Code. The package also has a SHA-256 checksum and inventory report. Marketplace publishing is not configured.
+Run `npm run package`, then use **Extensions: Install from VSIX** and select `devpilot-ai/artifacts/devpilot-ai-0.6.1.vsix` when packaging from the root. Reload VS Code. The package also has a SHA-256 checksum and inventory report. Marketplace publishing is not configured.
 
 ## Settings
 
